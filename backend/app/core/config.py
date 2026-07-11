@@ -3,7 +3,10 @@ from pathlib import Path
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.core import paths
+
 DEFAULT_SECRET = "dev-secret-troque-em-producao"
+DEFAULT_STORAGE = "../storage"
 
 
 class Settings(BaseSettings):
@@ -14,8 +17,8 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
 
     DATABASE_URL: str = "postgresql+psycopg://frota:frota@localhost:5434/frota"
-    STORAGE_DIR: str = "../storage"
-    CORS_ORIGINS: str = "http://localhost:5173"
+    STORAGE_DIR: str = DEFAULT_STORAGE
+    CORS_ORIGINS: str = "http://localhost:5273"
 
     # NÃO use um domínio .local/.test/.invalid aqui: o login valida o e-mail com EmailStr,
     # que recusa domínios reservados — o admin do seed nunca conseguiria entrar.
@@ -36,13 +39,25 @@ class Settings(BaseSettings):
         return self.ENV == "dev"
 
     @model_validator(mode="after")
-    def _fail_fast_on_weak_secret(self) -> "Settings":
+    def _resolve(self) -> "Settings":
+        if paths.IS_FROZEN:
+            # App instalado. Duas coisas mudam:
+            #
+            # 1. Program Files NÃO é gravável — as fotos e contratos têm que ir para a
+            #    pasta do usuário, senão o primeiro upload dá "Acesso negado".
+            # 2. O segredo padrão está no código-fonte. Cada instalação sorteia o seu na
+            #    primeira execução; sem isso, qualquer um forjaria um token de admin.
+            if self.STORAGE_DIR == DEFAULT_STORAGE:
+                self.STORAGE_DIR = str(paths.data_dir() / "storage")
+            if self.SECRET_KEY == DEFAULT_SECRET:
+                self.SECRET_KEY = paths.installation_secret()
+
         # Fora de dev, subir com o segredo padrão significa que qualquer um forja um JWT
         # e vira admin. Melhor não subir.
         if not self.is_dev and (self.SECRET_KEY == DEFAULT_SECRET or len(self.SECRET_KEY) < 32):
             raise RuntimeError(
-                "SECRET_KEY inseguro para ENV=%s. Gere um com: "
-                'python -c "import secrets; print(secrets.token_urlsafe(32))"' % self.ENV
+                f"SECRET_KEY inseguro para ENV={self.ENV}. Gere um com: "
+                'python -c "import secrets; print(secrets.token_urlsafe(32))"'
             )
         return self
 

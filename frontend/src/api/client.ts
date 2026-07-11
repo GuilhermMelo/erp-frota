@@ -11,7 +11,15 @@ export const tokenStore = {
 /** Emitido quando o token expira, para o AuthProvider deslogar sem prop drilling. */
 export const UNAUTHORIZED_EVENT = 'erp:unauthorized'
 
-export const api = axios.create({ baseURL: '/api' })
+/**
+ * Em DEV, o Vite faz proxy de `/api` para a API na porta 8010 (evita CORS).
+ * Em PRODUÇÃO (app empacotado), a própria API serve esta interface — mesma origem,
+ * então a base é a raiz.
+ *
+ * As rotas da interface são em português (/veiculos, /cobrancas) e as da API em inglês
+ * (/vehicles, /revenues): não colidem, e por isso as duas convivem no mesmo endereço.
+ */
+export const api = axios.create({ baseURL: import.meta.env.DEV ? '/api' : '' })
 
 api.interceptors.request.use((config) => {
   const token = tokenStore.get()

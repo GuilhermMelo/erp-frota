@@ -47,8 +47,8 @@ export function Layout() {
     <div className="flex min-h-screen">
       <aside className="flex w-60 shrink-0 flex-col border-r border-slate-200 bg-white">
         <div className="border-b border-slate-200 px-5 py-4">
-          <div className="text-lg font-semibold text-slate-900">ERP Frota</div>
-          <div className="text-xs text-slate-500">Locação de veículos</div>
+          <div className="text-lg font-semibold text-slate-900">GM Locações</div>
+          <div className="text-xs text-slate-500">Gestão de frota</div>
         </div>
 
         <nav className="flex-1 space-y-0.5 overflow-y-auto p-3">

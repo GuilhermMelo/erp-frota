@@ -28,7 +28,7 @@ export function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-slate-100 p-4">
       <Card className="w-full max-w-sm">
         <div className="mb-6 text-center">
-          <h1 className="text-xl font-semibold text-slate-900">ERP Frota</h1>
+          <h1 className="text-xl font-semibold text-slate-900">GM Locações</h1>
           <p className="mt-1 text-sm text-slate-500">Entre com sua conta de funcionário</p>
         </div>
 

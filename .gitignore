@@ -20,7 +20,15 @@ dist-ssr/
 # Arquivos enviados pelo usuário (fotos, contratos, notas fiscais)
 storage/
 
+# Log do backend (em dev o run_server.py grava na raiz do projeto)
+logs/
+
 # Editor / SO
 .DS_Store
 Thumbs.db
 *.log
+
+# Empacotamento
+backend/build/
+backend/dist/
+desktop/dist/

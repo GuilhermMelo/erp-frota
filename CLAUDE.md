@@ -1,4 +1,4 @@
-# CLAUDE.md — ERP Frota v1
+# CLAUDE.md — GM Locações (ERP de Frota)
 
 Guia do projeto para o Claude Code. **Leia no início de cada sessão.**
 
@@ -6,6 +6,9 @@ Guia do projeto para o Claude Code. **Leia no início de cada sessão.**
 
 ERP de gestão de frota para uma **locadora de veículos para motoristas de aplicativo** (Uber), de
 Guilherme Melo. Não é um CRUD de carros: é o sistema operacional da empresa.
+
+O nome do produto é **GM Locações**. A pasta do repositório ainda é `erp-frota-v1` (não renomeie: o
+nome do projeto Docker vem daí, e mudá-lo criaria um volume novo — o banco apareceria vazio).
 
 **A funcionalidade central — tudo o mais existe para alimentá-la:**
 
@@ -22,12 +25,22 @@ erp-frota-v1/
 ├── docker-compose.yml     Postgres 16 (porta 5434)
 ├── storage/               arquivos enviados (fora do git)
 ├── backend/               FastAPI + SQLAlchemy 2 + Alembic (Python 3.13)
+│   ├── run_server.py      entrada do .exe empacotado
+│   ├── erp-frota-api.spec receita do PyInstaller
 │   └── app/
-│       ├── core/          config · errors · security · context · storage
+│       ├── core/          config · errors · security · context · storage · paths
 │       ├── db/            session · base (base.py importa TODOS os models)
 │       └── domains/       um pacote por domínio: models · schemas · service · router
-└── frontend/              React 19 + TS + Vite + Tailwind + TanStack Query (PWA)
+├── frontend/              React 19 + TS + Vite + Tailwind + TanStack Query
+└── desktop/               Electron: janela + orquestração (Docker -> backend -> UI)
 ```
+
+**Portas:** 5434 (banco), 8010 (API), 5273 (Vite em dev). Não são as padrão de propósito — 5432/5433,
+8000 e 5173 já estão ocupadas nesta máquina por outros projetos.
+
+**A API serve a interface compilada** (`frontend/dist` → `static/` dentro do .exe). Funciona porque as
+rotas da interface são em português (`/veiculos`) e as da API em inglês (`/vehicles`): **não colidem**.
+O catch-all da SPA fica por último no `main.py` — não registre rota nova depois dele.
 
 ## Como rodar (dev)
 
@@ -65,10 +78,32 @@ Existe a skill `rodar-erp` com o passo a passo.
 
 ## Armadilhas já mapeadas (não recaia nelas)
 
+### Domínio
+
 - `custo_por_km` divide por `(current_odometer − purchase_odometer)` → carro novo dá **divisão por zero**. Retornar `NULL`, não 500.
 - `roi` divide por `investimento` → carro com `purchase_price = 0` idem.
 - Inadimplência é **derivada** (`status IN ('pending','partial') AND due_date < hoje`), não armazenada. Não criar job noturno.
 - Geração de cobrança é **idempotente** via `UNIQUE(contract_id, period_start)`. Pode rodar toda vez que o app abre.
+- **Vender carro com contrato ativo é recusado (409).** Se não fosse, a geração semanal continuaria
+  criando aluguel para um carro que não é mais do dono, e a caução ficaria presa.
+- `payback` é calculado só sobre a OPERAÇÃO (a venda não entra). Para carro vendido que não se pagou
+  rodando, devolve vazio — projetar prazo para um carro que não é mais seu seria mentira.
+
+### Empacotamento (app de desktop)
+
+- **`get_current_user` PRECISA ser `async def`.** Dependência síncrona roda numa thread com uma
+  *cópia* do contexto: o `set_actor()` escreveria numa cópia descartável e todo log de auditoria
+  sairia como `"sistema"`.
+- **O `.exe` roda com `console=False`** → `sys.stdout` é `None` e o uvicorn chama `.isatty()` nele.
+  Por isso o `run_server.py` redireciona as saídas para um arquivo ANTES de subir o uvicorn.
+  Log em arquivo não é conforto: é a única pista quando o app não abre na máquina de quem instalou.
+- **O `.spec` usa `collect_submodules("app")`, não `"app.main"`.** O Alembic lê `migrations/env.py` do
+  disco em tempo de execução, e o `from app.db.base import Base` de lá é invisível ao PyInstaller.
+- **Program Files não é gravável.** Tudo que o app escreve (fotos, `secret.key`) vai para
+  `%LOCALAPPDATA%\GM Locacoes\` (ver `app/core/paths.py`).
+- **`npm start` em `desktop/` falha DENTRO do VS Code**: ele define `ELECTRON_RUN_AS_NODE=1`, e aí o
+  Electron roda como Node puro e `require('electron')` devolve um caminho. Use terminal normal.
+- **`npm run dist` exige o Modo de desenvolvedor do Windows ligado** (o electron-builder cria symlinks).
 
 ## Estado atual
 

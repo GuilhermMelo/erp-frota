@@ -3,9 +3,11 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
+from app.core import paths
 from app.core.config import settings
 from app.core.errors import register_exception_handlers
 from app.db.session import SessionLocal, engine
@@ -26,13 +28,31 @@ from app.domains.vehicles.router import router as vehicles_router
 from app.seed import seed
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s [%(name)s] %(message)s")
+logger = logging.getLogger(__name__)
+
+
+def _migrate() -> None:
+    """Aplica as migrações pendentes no boot.
+
+    Num app de desktop ninguém vai abrir um terminal para rodar `alembic upgrade head`.
+    É idempotente: se já está atualizado, não faz nada.
+    """
+    from alembic import command
+    from alembic.config import Config
+
+    cfg = Config(str(paths.alembic_ini()))
+    cfg.set_main_option("script_location", str(paths.migrations_dir()))
+    cfg.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+    command.upgrade(cfg, "head")
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     settings.storage_path.mkdir(parents=True, exist_ok=True)
+    _migrate()
     with SessionLocal() as db:
         seed(db)
+    logger.info("ERP Frota pronto.")
     yield
 
 
@@ -80,3 +100,34 @@ def health():
     except Exception:
         return JSONResponse(status_code=503, content={"status": "erro", "db": "down"})
     return {"status": "ok", "db": "up"}
+
+
+# ---------------------------------------------------------------------------
+# A interface, servida pela própria API (só no app empacotado).
+#
+# As rotas da API são em inglês (/vehicles, /revenues) e as da interface em português
+# (/veiculos, /cobrancas): não colidem. Por isso as duas convivem na mesma porta, sem
+# CORS e sem um servidor web separado.
+#
+# O catch-all fica por ÚLTIMO de propósito: o FastAPI casa as rotas na ordem de registro,
+# então tudo que é API já foi resolvido acima. O que sobra é rota do React Router e tem
+# que devolver o index.html (senão dar F5 em /veiculos/123 daria 404).
+# ---------------------------------------------------------------------------
+_static = paths.static_dir()
+
+if _static.is_dir():
+    app.mount("/assets", StaticFiles(directory=_static / "assets"), name="assets")
+
+    _index = _static / "index.html"
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    def spa(full_path: str):
+        if full_path:
+            arquivo = (_static / full_path).resolve()
+            # `full_path` vem da URL: sem esta checagem, "../../.env" leria fora da pasta.
+            dentro_da_pasta = arquivo.is_relative_to(_static.resolve())
+            if dentro_da_pasta and arquivo.is_file():
+                return FileResponse(arquivo)  # favicon.svg, icons.svg, manifest...
+        return FileResponse(_index)
+else:
+    logger.info("Sem interface compilada em %s — rodando só a API (modo dev).", _static)

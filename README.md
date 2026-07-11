@@ -1,4 +1,4 @@
-# ERP Frota
+# GM Locações — ERP de Frota
 
 ERP de gestão de frota para locadora de veículos de motoristas de aplicativo.
 
@@ -12,7 +12,39 @@ Tudo o mais — contratos, vistorias, manutenções, multas — existe para alim
 
 ---
 
-## Como rodar
+## Como usar (app de desktop)
+
+O jeito normal de usar: **um ícone, um clique.** O app sobe o banco, o servidor e a janela sozinho.
+
+```bash
+# 1. Gerar o instalador (uma vez)
+#    ANTES: ligue o Modo de desenvolvedor do Windows
+#    (Configurações -> Privacidade e segurança -> Para desenvolvedores)
+#    Sem ele, o electron-builder não consegue criar os symlinks que precisa.
+cd frontend && npm run build           # compila a interface
+cd ../backend && pyinstaller erp-frota-api.spec --noconfirm   # empacota a API (62 MB, sem Python)
+cd ../desktop && npm install && npm run dist                  # gera o instalador
+# -> desktop/dist/GM Locações Setup 1.0.0.exe
+```
+
+Instale, e pronto: ícone na área de trabalho. **Não precisa de Python nem de terminal.**
+
+Na primeira execução o Windows mostra "O Windows protegeu o seu PC" — o `.exe` não é assinado
+digitalmente (custaria ~US$ 200/ano). Clique em **Mais informações → Executar assim mesmo**. Uma vez
+só, por máquina.
+
+> **O Docker Desktop precisa estar instalado** — é onde o Postgres roda. Ele já inicia junto com o
+> Windows, e o container está marcado como `restart: unless-stopped`, então o banco sobe sozinho e
+> você não percebe que ele existe. Se estiver parado, o próprio app o inicia.
+
+**Onde ficam os seus dados:**
+- Banco: volume do Docker (`erp-frota-v1_pgdata`).
+- Fotos, contratos e a chave de segurança: `%LOCALAPPDATA%\GM Locacoes\`
+- Log (se algo der errado): `%LOCALAPPDATA%\GM Locacoes\logs\backend.log`
+
+---
+
+## Como rodar (desenvolvimento)
 
 **Pré-requisitos:** Docker, Python 3.13, Node 20+.
 
