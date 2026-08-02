@@ -234,7 +234,7 @@ export function MaintenancesPage() {
             <AttachmentsPanel
               entityType="maintenance"
               entityId={attaching.id}
-              kind="nota_fiscal"
+              kinds={['nota_fiscal']}
               uploadLabel="Anexar nota fiscal"
             />
             <div className="mt-5 flex justify-end">

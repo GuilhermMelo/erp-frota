@@ -25,6 +25,8 @@ import {
   Textarea,
   Th,
 } from '../../components/ui'
+import type { AttachmentKind } from '../../lib/authFile'
+import { DOCUMENT_KIND_LABEL, DRIVER_REQUIRED_KINDS, attachmentsKey } from '../../lib/authFile'
 import { formatDate, formatMoney, today } from '../../lib/format'
 
 /* ---------------------------------------------------------------- tipos */
@@ -604,6 +606,61 @@ function FinishContractModal({
 
 /* ---------------------------------------------------------------- anexos */
 
+/**
+ * Mostra, na hora de assinar, quais documentos do motorista já existem e quais faltam.
+ *
+ * Os documentos da PESSOA (CNH, RG, comprovante de residência) moram no MOTORISTA, não aqui:
+ * se ficassem no contrato, o mesmo motorista assinando um segundo contrato teria a CNH
+ * duplicada, e "a CNH do João está vencida?" viraria uma caçada dentro dos contratos.
+ * Este painel é só leitura — anexar é na tela de Motoristas.
+ */
+function DriverDocumentsChecklist({ driver }: { driver: Contract['driver'] }) {
+  const { data, isPending } = useQuery({
+    queryKey: attachmentsKey('driver', driver?.id ?? ''),
+    enabled: driver !== null,
+    queryFn: async () => {
+      const { data } = await api.get<{ kind: AttachmentKind }[]>('/files', {
+        params: { entity_type: 'driver', entity_id: driver!.id },
+      })
+      return data
+    },
+  })
+
+  if (!driver || isPending) return null
+
+  const presentes = new Set(data?.map((d) => d.kind))
+  const faltando = DRIVER_REQUIRED_KINDS.filter((k) => !presentes.has(k))
+
+  return (
+    <div
+      className={`rounded-lg border p-3 text-sm ${
+        faltando.length
+          ? 'border-amber-200 bg-amber-50 text-amber-900'
+          : 'border-emerald-200 bg-emerald-50 text-emerald-900'
+      }`}
+    >
+      <div className="mb-2 font-medium">Documentos de {driver.full_name}</div>
+      <div className="flex flex-wrap gap-2">
+        {DRIVER_REQUIRED_KINDS.map((k) => (
+          <Badge
+            key={k}
+            label={`${presentes.has(k) ? '✓' : '✗'} ${DOCUMENT_KIND_LABEL[k]}`}
+            className={
+              presentes.has(k) ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
+            }
+          />
+        ))}
+      </div>
+      {faltando.length > 0 && (
+        <p className="mt-2 text-xs">
+          Anexe em <strong>Motoristas</strong> → botão do clipe. Eles ficam na pessoa, não no
+          contrato — assim valem para todos os contratos dela.
+        </p>
+      )}
+    </div>
+  )
+}
+
 function AttachmentsModal({ contract, onClose }: { contract: Contract; onClose: () => void }) {
   const queryClient = useQueryClient()
   const [kind, setKind] = useState('contrato_pdf')
@@ -660,6 +717,8 @@ function AttachmentsModal({ contract, onClose }: { contract: Contract; onClose: 
   return (
     <Modal open onClose={onClose} title={`Anexos do contrato ${contract.code}`} wide>
       <div className="space-y-4">
+        <DriverDocumentsChecklist driver={contract.driver} />
+
         <div className="flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 p-4">
           <div className="w-56">
             <Field label="Tipo do documento">

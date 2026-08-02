@@ -32,3 +32,9 @@ Thumbs.db
 backend/build/
 backend/dist/
 desktop/dist/
+
+# Postgres portátil embutido no app (baixado uma vez; ~120 MB, não versionar)
+desktop/vendor/
+
+# Configuração local do editor
+.vscode/

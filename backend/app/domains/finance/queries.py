@@ -22,6 +22,16 @@ from app.domains.vehicles.models import Vehicle
 ZERO = Decimal("0.00")
 
 
+# A LIXEIRA NÃO ENTRA NA CONTA.
+#
+# Excluir uma receita/despesa é exclusão LÓGICA (deleted_at). Se estes dois filtros saírem
+# daqui, o dono "apaga" R$ 800 e o lucro do carro não muda — e ele descobre isso meses depois,
+# quando for decidir se compra o próximo carro. É a classe de bug que este projeto existe para
+# não ter. TODA consulta financeira deste arquivo tem que carregar um dos dois.
+VIVA_REVENUE = Revenue.deleted_at.is_(None)
+VIVA_EXPENSE = Expense.deleted_at.is_(None)
+
+
 def _received_cte():
     """Receita EFETIVAMENTE recebida, por veículo."""
     return (
@@ -30,6 +40,8 @@ def _received_cte():
             func.coalesce(func.sum(RevenuePayment.amount), 0).label("received"),
         )
         .join(RevenuePayment, RevenuePayment.revenue_id == Revenue.id)
+        # Pagamento de receita na lixeira não é dinheiro recebido.
+        .where(VIVA_REVENUE)
         .group_by(Revenue.vehicle_id)
         .cte("received")
     )
@@ -42,7 +54,7 @@ def _receivable_cte():
             Revenue.vehicle_id.label("vehicle_id"),
             func.coalesce(func.sum(Revenue.amount - Revenue.paid_amount), 0).label("receivable"),
         )
-        .where(Revenue.status.in_([RevenueStatus.pending, RevenueStatus.partial]))
+        .where(Revenue.status.in_([RevenueStatus.pending, RevenueStatus.partial]), VIVA_REVENUE)
         .group_by(Revenue.vehicle_id)
         .cte("receivable")
     )
@@ -54,7 +66,6 @@ def _expense_cte():
     A separação é o que faz o custo por km ficar honesto: uma blindagem de R$ 15 mil é
     investimento, não "custo do mês".
     """
-    paid = Expense.status == ExpenseStatus.paid
     return (
         select(
             Expense.vehicle_id.label("vehicle_id"),
@@ -66,7 +77,7 @@ def _expense_cte():
             ).label("capex"),
         )
         .join(ExpenseCategory, ExpenseCategory.id == Expense.category_id)
-        .where(paid)
+        .where(Expense.status == ExpenseStatus.paid, VIVA_EXPENSE)
         .group_by(Expense.vehicle_id)
         .cte("expense_paid")
     )
@@ -78,7 +89,7 @@ def _pending_expense_cte():
             Expense.vehicle_id.label("vehicle_id"),
             func.coalesce(func.sum(Expense.amount), 0).label("pending"),
         )
-        .where(Expense.status == ExpenseStatus.pending)
+        .where(Expense.status == ExpenseStatus.pending, VIVA_EXPENSE)
         .group_by(Expense.vehicle_id)
         .cte("expense_pending")
     )

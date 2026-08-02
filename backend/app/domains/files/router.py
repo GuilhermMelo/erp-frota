@@ -10,11 +10,13 @@ from app.core.storage import storage
 from app.domains.auth.deps import CurrentUser, Db
 from app.domains.contracts.models import Contract
 from app.domains.drivers.models import Driver
+from app.domains.expenses.models import Expense
 from app.domains.files import service
 from app.domains.files.models import Document, DocumentKind
 from app.domains.files.schemas import DocumentOut, EntityType
 from app.domains.fines.models import Fine
 from app.domains.maintenances.models import Maintenance
+from app.domains.revenues.models import Revenue
 from app.domains.vehicles.models import Vehicle
 
 router = APIRouter(prefix="/files", tags=["arquivos"])
@@ -27,6 +29,8 @@ _ENTITIES: dict[EntityType, tuple[type, str]] = {
     EntityType.maintenance: (Maintenance, "maintenances"),
     EntityType.vehicle: (Vehicle, "vehicles"),
     EntityType.driver: (Driver, "drivers"),
+    EntityType.revenue: (Revenue, "revenues"),
+    EntityType.expense: (Expense, "expenses"),
 }
 
 

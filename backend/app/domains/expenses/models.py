@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from enum import Enum
 from uuid import UUID
@@ -7,6 +7,7 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     Date,
+    DateTime,
     Enum as SAEnum,
     ForeignKey,
     Index,
@@ -63,8 +64,13 @@ class Expense(UUIDPrimaryKey, TimestampMixin, Base):
 
     code: Mapped[str] = code_column("DES", "expense_code_seq")
 
-    vehicle_id: Mapped[UUID] = mapped_column(
-        PgUUID(as_uuid=True), ForeignKey("vehicles.id", ondelete="RESTRICT"), nullable=False, index=True
+    # NULO = despesa da EMPRESA (contador, internet, aluguel da sala), que não é de carro
+    # nenhum. Precisa ser uma escolha EXPLÍCITA na tela ("é da empresa"), nunca um campo
+    # deixado em branco por descuido: despesa sem carro some do lucro daquele carro, e o
+    # dono só descobre meses depois, na hora de decidir se compra o próximo.
+    # A despesa da empresa aparece separada no painel, justamente para não sumir da vista.
+    vehicle_id: Mapped[UUID | None] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("vehicles.id", ondelete="RESTRICT"), index=True
     )
     # Motorista associado (ex.: a multa foi dele). Serve para saber quanto cada um te deve.
     driver_id: Mapped[UUID | None] = mapped_column(
@@ -101,6 +107,10 @@ class Expense(UUIDPrimaryKey, TimestampMixin, Base):
     odometer: Mapped[int | None] = mapped_column(Integer)
     document_number: Mapped[str | None] = mapped_column(String(60))
     notes: Mapped[str | None] = mapped_column(Text)
+
+    # LIXEIRA — mesma regra da receita (ver revenues/models.py). Despesa na lixeira NÃO conta
+    # no custo do veículo; o filtro vive em finance/queries.py.
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
 
     category = relationship("ExpenseCategory", lazy="joined")
 

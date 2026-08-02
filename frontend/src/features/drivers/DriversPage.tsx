@@ -2,7 +2,7 @@ import { useState } from 'react'
 
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Pencil, Plus, Search, Trash2, TriangleAlert } from 'lucide-react'
+import { Paperclip, Pencil, Plus, Search, Trash2, TriangleAlert } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 
@@ -23,6 +23,8 @@ import {
   Td,
   Th,
 } from '../../components/ui'
+import { AttachmentsPanel } from '../../components/AttachmentsPanel'
+import { DRIVER_KINDS } from '../../lib/authFile'
 import { formatDate, today } from '../../lib/format'
 
 /* ---------------------------------------------------------------- tipos */
@@ -180,6 +182,7 @@ export function DriversPage() {
   const [editing, setEditing] = useState<Driver | null>(null)
   const [formOpen, setFormOpen] = useState(false)
   const [deleting, setDeleting] = useState<Driver | null>(null)
+  const [attaching, setAttaching] = useState<Driver | null>(null)
 
   const params = {
     q: search.trim() || undefined,
@@ -323,6 +326,13 @@ export function DriversPage() {
                     />
                   </Td>
                   <Td className="text-right whitespace-nowrap">
+                    <Button
+                      variant="ghost"
+                      onClick={() => setAttaching(driver)}
+                      title="Documentos (CNH, RG, comprovante de residência)"
+                    >
+                      <Paperclip size={16} />
+                    </Button>
                     <Button variant="ghost" onClick={() => openEdit(driver)} title="Editar">
                       <Pencil size={16} />
                     </Button>
@@ -345,6 +355,35 @@ export function DriversPage() {
       {formOpen && (
         <DriverFormModal driver={editing} onClose={() => setFormOpen(false)} />
       )}
+
+      <Modal
+        open={attaching !== null}
+        onClose={() => setAttaching(null)}
+        title={`Documentos de ${attaching?.full_name ?? ''}`}
+        wide
+      >
+        {attaching && (
+          <>
+            <p className="mb-4 text-sm text-slate-600">
+              CNH, RG e comprovante de residência são documentos <strong>da pessoa</strong>, e ficam
+              aqui — não no contrato. Assim o motorista pode assinar vários contratos sem você subir
+              os mesmos arquivos de novo, e eles continuam achaveis mesmo depois que um contrato
+              termina.
+            </p>
+            <AttachmentsPanel
+              entityType="driver"
+              entityId={attaching.id}
+              kinds={DRIVER_KINDS}
+              uploadLabel="Anexar documento"
+            />
+            <div className="mt-5 flex justify-end">
+              <Button variant="secondary" onClick={() => setAttaching(null)}>
+                Fechar
+              </Button>
+            </div>
+          </>
+        )}
+      </Modal>
 
       <Modal
         open={deleting !== null}

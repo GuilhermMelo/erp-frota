@@ -22,13 +22,14 @@
         "to": "backend"
       },
       {
-        "from": "../docker-compose.yml",
-        "to": "docker-compose.yml"
+        "from": "vendor/pgsql",
+        "to": "pgsql"
       }
     ],
     "win": {
       "target": "nsis",
-      "icon": "icon.png"
+      "icon": "icon.png",
+      "signAndEditExecutable": false
     },
     "nsis": {
       "oneClick": false,

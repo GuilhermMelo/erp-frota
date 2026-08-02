@@ -25,17 +25,22 @@ def resource_dir() -> Path:
 def data_dir() -> Path:
     """Onde o app ESCREVE: fotos, contratos, chave secreta.
 
-    Instalado, o app mora em `C:\\Program Files`, que NÃO é gravável pelo usuário. Gravar
-    ao lado do .exe daria "Acesso negado" no primeiro upload de foto. Tudo que o app
-    escreve vai para a pasta do usuário.
+    É o MESMO caminho rodando do código-fonte ou do .exe instalado — e isso é obrigatório,
+    não conveniência:
+
+    Os dois modos falam com o MESMO banco (Postgres em localhost:5434). O banco guarda só o
+    CAMINHO do arquivo (`contracts/CTR000001/x.pdf`), não os bytes. Se cada modo tivesse uma
+    raiz diferente, um PDF anexado pelo app instalado não abriria no modo de desenvolvimento —
+    o banco apontaria para um arquivo que, naquele contexto, não existe. O dono veria
+    "Arquivo não encontrado" num documento que está no disco, ali, intacto.
+
+    Fica na pasta do usuário porque o app instalado mora em `C:\\Program Files`, que NÃO é
+    gravável: gravar ao lado do .exe daria "Acesso negado" no primeiro upload de foto.
     """
-    if IS_FROZEN:
-        base = os.environ.get("LOCALAPPDATA") or str(Path.home())
-        # Sem acento e sem espaço problemático: este caminho aparece em log, em mensagem de
-        # erro e na barra de endereço do Explorer quando o dono for procurar as fotos.
-        d = Path(base) / "GM Locacoes"
-    else:
-        d = resource_dir().parent  # a raiz do projeto, em desenvolvimento
+    base = os.environ.get("LOCALAPPDATA") or str(Path.home())
+    # Sem acento: este caminho aparece em log, em mensagem de erro e na barra do Explorer
+    # quando o dono for procurar as fotos.
+    d = Path(base) / "GM Locacoes"
     d.mkdir(parents=True, exist_ok=True)
     return d
 

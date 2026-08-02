@@ -112,6 +112,20 @@ class Revenue(UUIDPrimaryKey, TimestampMixin, Base):
 
     notes: Mapped[str | None] = mapped_column(Text)
 
+    # LIXEIRA. Excluir uma receita NÃO apaga a linha — marca a data aqui.
+    #
+    # Duas razões, e a segunda é sutil:
+    #   1. Dinheiro apagado por engano tem que voltar. O dono restaura e pronto.
+    #   2. A linha PRECISA continuar existindo para a trava UNIQUE(contract_id, period_start)
+    #      seguir valendo. Se a cobrança semanal fosse apagada de verdade, o gerador (que roda
+    #      toda vez que o app abre) a RECRIARIA na hora. A lixeira é o que impede a ressurreição
+    #      — e é por isso que agora dá para excluir cobrança de contrato, o que antes era proibido.
+    #
+    # ATENÇÃO: quem estiver na lixeira NÃO pode contar no lucro do veículo. O filtro vive em
+    # finance/queries.py. Sem ele, você "apaga" R$ 800 e o lucro do carro não muda — que é
+    # exatamente a classe de bug que este projeto existe para não ter.
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+
     payments = relationship(
         "RevenuePayment", back_populates="revenue", cascade="all, delete-orphan", lazy="selectin"
     )

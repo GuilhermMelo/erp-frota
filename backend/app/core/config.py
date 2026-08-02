@@ -40,17 +40,17 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _resolve(self) -> "Settings":
-        if paths.IS_FROZEN:
-            # App instalado. Duas coisas mudam:
-            #
-            # 1. Program Files NÃO é gravável — as fotos e contratos têm que ir para a
-            #    pasta do usuário, senão o primeiro upload dá "Acesso negado".
-            # 2. O segredo padrão está no código-fonte. Cada instalação sorteia o seu na
-            #    primeira execução; sem isso, qualquer um forjaria um token de admin.
-            if self.STORAGE_DIR == DEFAULT_STORAGE:
-                self.STORAGE_DIR = str(paths.data_dir() / "storage")
-            if self.SECRET_KEY == DEFAULT_SECRET:
-                self.SECRET_KEY = paths.installation_secret()
+        # A pasta de arquivos é a MESMA no código-fonte e no .exe instalado (ver paths.py).
+        # Os dois falam com o mesmo banco, e o banco guarda só o CAMINHO do arquivo — raízes
+        # diferentes fariam um PDF anexado num modo não abrir no outro.
+        # Os testes sobrescrevem STORAGE_DIR para um tmp; por isso o `if`.
+        if self.STORAGE_DIR == DEFAULT_STORAGE:
+            self.STORAGE_DIR = str(paths.data_dir() / "storage")
+
+        # O segredo padrão está no código-fonte. Cada instalação sorteia o seu na primeira
+        # execução; sem isso, qualquer um forjaria um token de admin.
+        if paths.IS_FROZEN and self.SECRET_KEY == DEFAULT_SECRET:
+            self.SECRET_KEY = paths.installation_secret()
 
         # Fora de dev, subir com o segredo padrão significa que qualquer um forja um JWT
         # e vira admin. Melhor não subir.

@@ -340,7 +340,7 @@ export function FinesPage() {
             <AttachmentsPanel
               entityType="fine"
               entityId={attaching.id}
-              kind="notificacao"
+              kinds={['notificacao']}
               uploadLabel="Anexar notificação"
             />
             <div className="mt-5 flex justify-end">

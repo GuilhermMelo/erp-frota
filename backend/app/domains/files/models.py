@@ -10,13 +10,35 @@ from app.db.base_class import Base, UUIDPrimaryKey
 
 
 class DocumentKind(str, Enum):
+    """Tipos de anexo.
+
+    Repare em QUEM é o dono de cada um (o `entity_type` do Document):
+
+    - `cnh`, `rg`, `comprovante_residencia` são documentos da PESSOA → vão no MOTORISTA.
+      Pendurá-los no contrato duplicaria o arquivo a cada contrato novo do mesmo motorista,
+      e "a CNH do João está vencida?" viraria uma caçada dentro dos contratos.
+    - `contrato_pdf`, `confissao_divida`, `assinatura` são do CONTRATO.
+    - `crlv`, `laudo_cautelar`, `nota_fiscal` (da compra) são do VEÍCULO.
+    - `notificacao` é da MULTA; `nota_fiscal` também serve à MANUTENÇÃO.
+    """
+
+    # do contrato
     contrato_pdf = "contrato_pdf"
     confissao_divida = "confissao_divida"
     assinatura = "assinatura"
-    nota_fiscal = "nota_fiscal"
+    # do motorista (a pessoa)
     cnh = "cnh"
+    rg = "rg"
+    comprovante_residencia = "comprovante_residencia"
+    # do veículo
     crlv = "crlv"
-    notificacao = "notificacao"  # notificação de multa
+    laudo_cautelar = "laudo_cautelar"
+    # da multa / manutenção
+    notificacao = "notificacao"
+    nota_fiscal = "nota_fiscal"
+    # do recebimento (print do PIX, recibo)
+    comprovante = "comprovante"
+    # genéricos
     foto = "foto"
     outro = "outro"
 

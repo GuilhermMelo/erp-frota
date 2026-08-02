@@ -16,6 +16,12 @@ class EntityType(str, Enum):
     maintenance = "maintenance"
     vehicle = "vehicle"
     driver = "driver"
+    # Comprovante do recebimento (print do PIX, recibo) e da despesa (cupom, boleto pago).
+    # Fica na RECEITA/DESPESA, que já têm código (REC000001 / DES000001) — a chave do arquivo
+    # no disco precisa de um: `revenues/REC000001/pix.jpg`. O pagamento em si
+    # (revenue_payments) não tem código legível.
+    revenue = "revenue"
+    expense = "expense"
 
 
 class DocumentOut(BaseModel):

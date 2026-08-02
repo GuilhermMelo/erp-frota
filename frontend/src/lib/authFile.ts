@@ -20,12 +20,45 @@ export type AttachmentKind =
   | 'contrato_pdf'
   | 'confissao_divida'
   | 'assinatura'
-  | 'nota_fiscal'
   | 'cnh'
+  | 'rg'
+  | 'comprovante_residencia'
   | 'crlv'
+  | 'laudo_cautelar'
   | 'notificacao'
+  | 'nota_fiscal'
   | 'foto'
   | 'outro'
+
+export const DOCUMENT_KIND_LABEL: Record<AttachmentKind, string> = {
+  contrato_pdf: 'Contrato assinado (PDF)',
+  confissao_divida: 'Confissão de dívida',
+  assinatura: 'Assinatura',
+  cnh: 'CNH',
+  rg: 'RG',
+  comprovante_residencia: 'Comprovante de residência',
+  crlv: 'CRLV',
+  laudo_cautelar: 'Laudo cautelar',
+  notificacao: 'Notificação da multa',
+  nota_fiscal: 'Nota fiscal',
+  foto: 'Foto',
+  outro: 'Outro',
+}
+
+/**
+ * Documentos da PESSOA. Moram no MOTORISTA, nunca no contrato.
+ *
+ * Se ficassem no contrato, o mesmo motorista assinando um segundo contrato teria a CNH
+ * duplicada (duas cópias que divergem), e "a CNH do João está vencida?" viraria uma caçada
+ * dentro dos contratos.
+ */
+export const DRIVER_KINDS: AttachmentKind[] = ['cnh', 'rg', 'comprovante_residencia', 'foto', 'outro']
+
+/** Documentos do VEÍCULO. */
+export const VEHICLE_KINDS: AttachmentKind[] = ['crlv', 'laudo_cautelar', 'nota_fiscal', 'foto', 'outro']
+
+/** Os três que a locadora precisa ter em mãos antes de entregar um carro. */
+export const DRIVER_REQUIRED_KINDS: AttachmentKind[] = ['cnh', 'rg', 'comprovante_residencia']
 
 export type DocumentOut = {
   id: string
