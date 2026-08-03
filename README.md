@@ -13,6 +13,11 @@ ERP de gestão de frota para uma locadora de veículos de motoristas de aplicati
 Backend em FastAPI, interface em React, empacotado como app de desktop que instala com um clique —
 sem Docker, sem Python, sem terminal na máquina de quem usa.
 
+![A conta do veículo](docs/img/conta-do-veiculo.png)
+
+> *A tela central: a equação do lucro com cada parcela clicável. Todos os dados destas imagens são
+> fictícios — placas, nomes e CPFs foram inventados para a demonstração.*
+
 ---
 
 ## O problema
@@ -65,6 +70,17 @@ motorista te deve.
 | **Multas** | Vinculadas ao carro e ao motorista. Pagar gera despesa; reembolso gera receita. |
 | **Vistorias** | Checklist estruturado + até 200 fotos (comprimidas no navegador) + foto da assinatura. |
 | **Auditoria** | Log append-only de quem mudou o quê, com o "de → para". |
+
+![Lista de veículos](docs/img/veiculos.png)
+
+*A frota inteira com o lucro de cada carro na última coluna. Aqui a frota de demonstração cobre os
+quatro estados que importam: um que já se pagou, um ainda em formação, um vendido com o ciclo
+fechado e um comprado na semana passada — o caso em que ROI e custo/km dividiriam por zero.*
+
+![Cobranças e inadimplência](docs/img/cobrancas.png)
+
+*Inadimplência não é um campo no banco: é `status IN ('pending','partial') AND due_date < hoje`,
+calculado na hora. Sem job noturno e sem estado que fica velho se o job falhar.*
 
 ---
 
