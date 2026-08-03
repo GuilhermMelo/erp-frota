@@ -71,6 +71,11 @@ motorista te deve.
 | **Vistorias** | Checklist estruturado + até 200 fotos (comprimidas no navegador) + foto da assinatura. |
 | **Auditoria** | Log append-only de quem mudou o quê, com o "de → para". |
 
+![Painel](docs/img/dashboard.png)
+
+*O painel: situação da frota, resultado do mês, o que está vencido e a série de receita × despesa
+desde o primeiro carro.*
+
 ![Lista de veículos](docs/img/veiculos.png)
 
 *A frota inteira com o lucro de cada carro na última coluna. Aqui a frota de demonstração cobre os
