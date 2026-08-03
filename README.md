@@ -69,6 +69,7 @@ motorista te deve.
 | **Manutenções** | Histórico (descrição, valor, KM, data). **Gera a despesa automaticamente.** |
 | **Multas** | Vinculadas ao carro e ao motorista. Pagar gera despesa; reembolso gera receita. |
 | **Vistorias** | Checklist estruturado + até 200 fotos (comprimidas no navegador) + foto da assinatura. |
+| **Usuários** | Quem tem login. Dois papéis: `operador` toca o dia a dia, `admin` faz o que não tem volta. Usuário não se exclui — se desativa. |
 | **Auditoria** | Log append-only de quem mudou o quê, com o "de → para". |
 
 ![Painel](docs/img/dashboard.png)
@@ -90,6 +91,11 @@ cobrança em aberto **nunca** entra no lucro. Contar dinheiro que não entrou é
 
 *Inadimplência não é um campo no banco: é `status IN ('pending','partial') AND due_date < hoje`,
 calculado na hora. Sem job noturno e sem estado que fica velho se o job falhar.*
+
+![Usuários](docs/img/usuarios.png)
+
+*Usuário se **desativa**, não se exclui: o log de auditoria aponta para o e-mail de quem agiu, e
+apagar a linha deixaria o histórico órfão de contexto. Pelo mesmo motivo o e-mail não é editável.*
 
 ---
 
@@ -208,10 +214,27 @@ cd frontend && npm install && npm run dev
 > **`pg_ctl start` trava se a saída for canalizada no PowerShell.** O servidor herda o handle de
 > stdout e o pipeline nunca fecha — o banco sobe, mas o comando fica pendurado. Não use `|`.
 
+### Demonstrar o sistema sem expor dado real
+
+```powershell
+.\scripts\demo.ps1     # sobe uma instância isolada em http://127.0.0.1:8011
+```
+
+Banco próprio, porta própria, frota inventada. O banco de trabalho não é tocado, e ao sair o
+banco de demonstração é apagado.
+
+**Por que não basta um "usuário demo" no sistema real:** os papéis limitam **ações** — 19
+endpoints exigem admin — mas **não limitam visibilidade**. É um ERP de uma empresa só; não existe
+usuário que veja menos. Entrar como demo no banco real mostraria CPF e CNH de motoristas de
+verdade. A única separação que existe é outro banco, e este script torna esse caminho o mais fácil.
+
+As senhas da demonstração são fracas de propósito, e isso não é descuido: os dados são inventados.
+O que protege dado pessoal é o isolamento, não a força da senha de um banco de mentira.
+
 ### Testes
 
 ```bash
-cd backend && pytest        # 113 testes; cria e derruba um banco `frota_test` isolado
+cd backend && pytest        # 120 testes; cria e derruba um banco `frota_test` isolado
 ```
 
 A suíte tem guards que abortam a execução se a `DATABASE_URL` apontar para o banco de

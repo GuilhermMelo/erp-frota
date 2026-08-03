@@ -38,6 +38,8 @@ Thumbs.db
 backend/build/
 backend/dist/
 desktop/dist/
+# A interface compilada que a API serve. Gerada por `npm run build` — é artefato, não fonte.
+backend/static/
 
 # Postgres portátil embutido no app (baixado uma vez; ~120 MB, não versionar)
 desktop/vendor/

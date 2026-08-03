@@ -13,6 +13,7 @@ import {
   UserCog,
   Users,
   Wrench,
+  type LucideIcon,
 } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
 
@@ -20,7 +21,11 @@ import { api } from '../api/client'
 import { useAuth } from '../features/auth/AuthContext'
 import { cn } from './ui'
 
-const NAV = [
+// Tipo explícito: sem ele, o spread de NAV com NAV_ADMIN faz o TypeScript inferir uma
+// união onde `end` só existe num dos lados, e o destructuring no map não compila.
+type ItemNav = { to: string; label: string; icon: LucideIcon; end?: boolean }
+
+const NAV: ItemNav[] = [
   { to: '/', label: 'Painel', icon: LayoutDashboard, end: true },
   { to: '/veiculos', label: 'Veículos', icon: Car },
   { to: '/motoristas', label: 'Motoristas', icon: Users },
@@ -35,7 +40,7 @@ const NAV = [
 
 // Fora do NAV comum: a API recusa GET /users para operador, então mostrar o item para
 // quem não é admin seria oferecer uma porta que abre num erro.
-const NAV_ADMIN = [{ to: '/usuarios', label: 'Usuários', icon: UserCog }]
+const NAV_ADMIN: ItemNav[] = [{ to: '/usuarios', label: 'Usuários', icon: UserCog }]
 
 export function Layout() {
   const { user, logout } = useAuth()
