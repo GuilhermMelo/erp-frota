@@ -48,7 +48,9 @@ def _migrate() -> None:
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    settings.storage_path.mkdir(parents=True, exist_ok=True)
+    # Só o modo local tem pasta para criar. No Supabase o bucket já existe.
+    if settings.STORAGE_BACKEND == "local":
+        settings.storage_path.mkdir(parents=True, exist_ok=True)
     _migrate()
     with SessionLocal() as db:
         seed(db)

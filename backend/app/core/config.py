@@ -17,8 +17,20 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
 
     DATABASE_URL: str = "postgresql+psycopg://frota:frota@localhost:5434/frota"
-    STORAGE_DIR: str = DEFAULT_STORAGE
     CORS_ORIGINS: str = "http://localhost:5273"
+
+    # --- Arquivos (CNH, contratos, fotos de vistoria) ---------------------------
+    # "local" grava em disco; "supabase" grava no Storage do Supabase.
+    # Em hospedagem sem volume (Render, Railway) o disco do container SOME a cada
+    # deploy: "local" ali significa perder foto de vistoria e contrato assinado.
+    STORAGE_BACKEND: str = "local"
+    STORAGE_DIR: str = DEFAULT_STORAGE
+
+    SUPABASE_URL: str = ""
+    # A chave `service_role`. NUNCA vai para o frontend: ela ignora RLS por
+    # definição. Vive só como variável de ambiente do servidor.
+    SUPABASE_SERVICE_KEY: str = ""
+    SUPABASE_BUCKET: str = "arquivos"
 
     # NÃO use um domínio .local/.test/.invalid aqui: o login valida o e-mail com EmailStr,
     # que recusa domínios reservados — o admin do seed nunca conseguiria entrar.
@@ -61,6 +73,29 @@ class Settings(BaseSettings):
             raise RuntimeError(
                 f"SECRET_KEY inseguro para ENV={self.ENV}. Gere um com: "
                 'python -c "import secrets; print(secrets.token_urlsafe(32))"'
+            )
+
+        # Em nuvem o SECRET_KEY TEM que vir de variável de ambiente e ser FIXO. Se cada
+        # deploy sorteasse um novo, todo token emitido antes viraria inválido e o sistema
+        # deslogaria todo mundo a cada publicação — parecendo bug intermitente de login.
+
+        # Sem a senha configurada, o seed sorteia e grava num arquivo. Isso funciona no
+        # desktop, onde o dono abre a pasta e lê. Num container o arquivo morre com o
+        # deploy: ninguém nunca veria a senha e o sistema nasceria inacessível.
+        if not self.is_dev and not self.ADMIN_PASSWORD:
+            raise RuntimeError(
+                f"ADMIN_PASSWORD é obrigatório para ENV={self.ENV}. Fora do desktop não há "
+                "onde entregar uma senha sorteada. Defina a variável, entre no sistema e "
+                "troque a senha pela tela de Usuários."
+            )
+
+        if self.STORAGE_BACKEND not in ("local", "supabase"):
+            raise RuntimeError(f"STORAGE_BACKEND inválido: {self.STORAGE_BACKEND!r}.")
+
+        if self.STORAGE_BACKEND == "supabase" and not (self.SUPABASE_URL and self.SUPABASE_SERVICE_KEY):
+            raise RuntimeError(
+                "STORAGE_BACKEND=supabase exige SUPABASE_URL e SUPABASE_SERVICE_KEY. "
+                "Falhar aqui é melhor que aceitar upload e perder o arquivo."
             )
         return self
 

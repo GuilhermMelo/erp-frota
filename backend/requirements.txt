@@ -9,3 +9,6 @@ pyjwt==2.10.1
 bcrypt==5.0.0
 python-multipart==0.0.20
 pillow==11.3.0
+# Cliente do Storage do Supabase. Sem o SDK `supabase-py`: são três chamadas REST,
+# e o SDK traria uma árvore de dependências inteira para isso.
+httpx==0.28.1

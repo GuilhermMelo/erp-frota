@@ -1,0 +1,55 @@
+# Deploy no Render. (No Railway, aponte para o Dockerfile e defina as mesmas variáveis.)
+#
+# O banco NÃO está declarado aqui de propósito: ele é o Postgres do Supabase, criado
+# fora do Render. Declarar um banco aqui criaria um segundo, vazio, e o sistema subiria
+# apontando para o lugar errado.
+#
+# NENHUM segredo neste arquivo — ele é versionado num repositório PÚBLICO.
+# `sync: false` faz o Render pedir o valor no painel, uma vez, e guardar criptografado.
+
+services:
+  - type: web
+    name: gm-locacoes
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: ENV
+        value: production
+
+      # Postgres do Supabase. Use a porta 6543 (pooler, PgBouncer transaction mode) —
+      # o app já se ajusta a ela sozinho (ver app/db/session.py). Não esqueça o
+      # ?sslmode=require: o Supabase recusa conexão em texto claro.
+      # postgresql+psycopg://postgres.<ref>:<senha>@aws-0-<regiao>.pooler.supabase.com:6543/postgres?sslmode=require
+      - key: DATABASE_URL
+        sync: false
+
+      # FIXO entre deploys. Se mudar, todo token emitido antes vira inválido e o sistema
+      # desloga todo mundo a cada publicação.
+      # Gere com: python -c "import secrets; print(secrets.token_urlsafe(32))"
+      - key: SECRET_KEY
+        sync: false
+
+      # Só para o primeiro boot criar o admin. Entre, troque a senha pela tela de
+      # Usuários e apague esta variável.
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+
+      # Arquivos no Storage do Supabase: o disco do container some a cada deploy.
+      - key: STORAGE_BACKEND
+        value: supabase
+      - key: SUPABASE_URL
+        sync: false
+      # Chave `service_role`. Ignora RLS por definição — nunca vai para o frontend.
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: SUPABASE_BUCKET
+        value: arquivos
+
+      # A interface é servida pela própria API, então mesma origem e sem CORS. Isto só
+      # importa se um dia o front for hospedado à parte.
+      - key: CORS_ORIGINS
+        sync: false
