@@ -250,6 +250,24 @@ digitalmente (custaria ~US$ 200/ano). **Mais informações → Executar assim me
 Fica na pasta do usuário porque `C:\Program Files` não é gravável: gravar ao lado do `.exe` daria
 "Acesso negado" no primeiro upload de foto.
 
+### Backup
+
+```powershell
+.\scripts\backup.ps1              # copia o banco e os arquivos
+.\scripts\backup.ps1 -Verificar   # copia e PROVA que a cópia restaura
+```
+
+**O banco e os arquivos são copiados juntos, e isso não é zelo — é obrigatório.** O banco guarda o
+*caminho* do arquivo (`contracts/CTR000001/contrato.pdf`), nunca os bytes. Restaurar só o banco
+devolveria um sistema que aponta para PDFs e fotos de CNH que não existem mais.
+
+O `-Verificar` restaura a cópia num banco descartável, confere e o derruba — o banco de trabalho
+nunca é tocado. **Backup que nunca foi restaurado não é backup, é esperança.**
+
+As cópias ficam em `%LOCALAPPDATA%\GM Locacoes\backups\` (as 10 mais recentes) e contêm CPF, CNH e
+contratos: leve uma para fora da máquina, e não suba para nuvem pública sem criptografar. Backup
+que mora no mesmo disco do original não protege contra o disco morrer.
+
 ---
 
 ## Stack

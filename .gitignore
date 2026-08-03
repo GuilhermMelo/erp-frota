@@ -20,6 +20,12 @@ dist-ssr/
 # Arquivos enviados pelo usuário (fotos, contratos, notas fiscais)
 storage/
 
+# Cópias de segurança. Contêm CPF, CNH e contratos — dado pessoal (LGPD).
+# Elas nascem em %LOCALAPPDATA%; esta linha é a rede de proteção caso alguém
+# aponte o backup para dentro do projeto.
+backups/
+*.dump
+
 # Log do backend (em dev o run_server.py grava na raiz do projeto)
 logs/
 

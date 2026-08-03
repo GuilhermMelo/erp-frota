@@ -6,7 +6,10 @@
 
 ## Próximo
 
-1. **Trocar a senha do admin nas instalações que já existem.** O mecanismo novo (senha sorteada)
+1. **Rodar `scripts\backup.ps1` toda semana e levar uma cópia para fora da máquina.** O script
+   existe desde a Sessão 5, mas backup que fica no mesmo disco não protege contra o disco morrer.
+   Ainda não há agendamento automático — hoje depende de alguém lembrar.
+2. **Trocar a senha do admin nas instalações que já existem.** O mecanismo novo (senha sorteada)
    só age onde ainda não há usuário. Onde o admin já foi criado com `admin123`, a troca é manual —
    ou apague o usuário e deixe o seed recriá-lo no próximo boot.
 2. **Gerar o instalador** — bloqueado por uma permissão do Windows. Ligue o **Modo de
@@ -90,6 +93,27 @@ O commit `8e42e1e` descreve o CAR000001 como "um carro que já se pagou (payback
 Isso valia para a **primeira** leva de dados de demonstração. Depois de refazer o seed deixando
 cobranças vencidas, o mesmo carro ficou em `-R$ 640,16`, com payback estimado em ~2 meses. As
 legendas do README foram corrigidas; a mensagem do commit ficou como está.
+
+### Backup — o buraco maior, encontrado ao liberar o cadastro real
+
+Perguntado se era seguro cadastrar a frota de verdade, a resposta era **não** — e não pelo motivo
+que eu esperava. O projeto não tinha **nenhum** backup: nem script, nem rotina, nem menção. Toda a
+operação da empresa passaria a viver numa pasta, numa máquina, sem cópia.
+
+`scripts\backup.ps1` copia o banco (`pg_dump -Fc`) **e** o `storage/` na mesma foto. Os dois
+juntos porque o banco guarda só o CAMINHO do arquivo: restaurar só o banco devolveria um sistema
+apontando para PDFs e fotos de CNH inexistentes — o mesmo motivo pelo qual `data_dir()` é idêntico
+em dev e no `.exe` (ver `paths.py`).
+
+`-Verificar` restaura num banco descartável e derruba em seguida. Testado com volume real
+(`frota_demo`): 4 veículos, 319 cobranças, 2059 registros de auditoria e R$ 181.450,00 recebidos —
+idêntico antes e depois.
+
+Rotaciona guardando as 10 mais recentes. `backups/` e `*.dump` entraram no `.gitignore`: o arquivo
+tem CPF e CNH, e o repositório é público.
+
+**Não resolvido:** o backup depende de alguém lembrar de rodar. Agendamento automático (Task
+Scheduler, ou o próprio Electron ao fechar) não existe.
 
 ### Pendências do mesmo tipo (mapeadas, não corrigidas)
 
