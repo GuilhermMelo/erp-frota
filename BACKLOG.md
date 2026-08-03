@@ -42,6 +42,74 @@ Nenhuma bloqueia o uso.
 
 ---
 
+## Sessão 6 — 2026-08-03
+
+Ida para a nuvem: Supabase como banco, Render/Railway como hospedagem.
+
+### Decisão: dois repositórios
+
+O público (`erp-frota`) vira **instantâneo de portfólio** e congela. O real passa a viver num
+repositório **privado**, com todo o histórico.
+
+Vale registrar o que foi discutido, porque a premissa merece cuidado: **repositório público não
+impede o sistema de rodar a operação real** — o trabalho da Sessão 4 (nenhum segredo no código,
+senha sorteada, tudo por variável de ambiente) existe exatamente para isso. O que não pode
+vazar são dados e credenciais, e esses nunca estiveram no Git. A escolha pelo privado é sobre
+não publicar a lógica de negócio daqui em diante, não sobre segurança de credencial.
+
+**Antes de `git push`, confira o remoto.** Empurrar detalhe de operação para o público é o erro
+fácil deste arranjo.
+
+### Quatro coisas quebravam ao sair da máquina — todas em silêncio
+
+1. **Arquivos.** `LocalStorage` grava em disco. Em Render/Railway o disco do container some a
+   cada deploy: foto de vistoria e contrato assinado iriam junto. → `SupabaseStorage`, os mesmos
+   4 métodos que a interface já previa, via REST. Sem o SDK `supabase-py`: são três chamadas
+   HTTP e o SDK traria uma árvore de dependências inteira. Bucket **privado** — CNH não tem URL
+   pública, e o download continua pelo `GET /files/{key}` autenticado.
+2. **`SECRET_KEY`.** Era sorteado por instalação e gravado em `secret.key`. Num container o
+   arquivo é novo a cada deploy → todo token anterior inválido → **todo mundo deslogado a cada
+   publicação**, parecendo bug intermitente de login. → Variável de ambiente, fixa.
+3. **Senha do admin.** O seed sorteia e grava num arquivo. No desktop o dono abre e lê; num
+   container ninguém lê e o arquivo morre no deploy seguinte — o sistema nasceria inacessível.
+   → Fora de `dev`, `ADMIN_PASSWORD` é obrigatório e o boot falha sem ela.
+4. **Pooler do Supabase.** A porta 6543 é PgBouncer em modo *transaction*: reaproveita conexões
+   entre transações e derruba os prepared statements que o psycopg cria sozinho. O erro seria
+   `prepared statement "_pg3_0" does not exist` — **intermitente e só sob carga**, o pior modo
+   de descobrir. → `prepare_threshold=None` + `NullPool`, detectado pelo host.
+
+Fora de `ENV=dev` o boot agora **falha** com `SECRET_KEY` padrão ou curto, sem `ADMIN_PASSWORD`,
+ou com `STORAGE_BACKEND=supabase` sem credencial. Falhar no boot é melhor que aceitar upload e
+perder o arquivo.
+
+### Empacotamento
+
+`Dockerfile` multi-estágio (Node compila a interface, Python serve tudo) mantendo o arranjo de
+uma porta só — sem CORS, porque não há duas origens. Usuário sem privilégio, não root.
+`render.yaml` com `sync: false` em tudo que é segredo: o Render pede no painel e guarda
+criptografado, e o arquivo — que o repositório público lê — não contém nada.
+
+**As migrações continuam rodando no lifespan do app**, não no `CMD` do Docker: assim um deploy
+que sobe duas instâncias não dispara dois `alembic upgrade` concorrentes.
+
+### Verificado
+
+12 testes novos (`test_config_producao.py`) cobrindo cada trava e a detecção do pooler.
+**132 no total, todos passando.**
+
+### Pendente
+
+Criar o projeto no Supabase, o bucket `arquivos` (privado) e o repositório privado. O banco local
+tem 0 veículos e 0 motoristas — **não há dado para migrar**, o que torna este o melhor momento
+possível para a mudança.
+
+### Ainda não resolvido
+
+**LGPD muda de figura.** CPF e CNH sairão da máquina do dono para a nuvem de um terceiro. Escolher
+a região São Paulo do Supabase e registrar o contrato de tratamento de dados.
+
+---
+
 ## Sessão 5 — 2026-08-03
 
 Edição de veículo. O fluxo de cadastro estava incompleto e ninguém tinha percebido.

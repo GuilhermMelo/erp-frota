@@ -11,7 +11,16 @@ bonita que seja.
 
 ## Arquitetura
 
+**Dois repositórios, de propósito:**
+
+- `erp-frota` (**público**) — instantâneo de portfólio. Congelado; só atualiza quando decidido.
+- repositório **privado** — o projeto real, com todo o histórico. É para onde vão os commits.
+
+Antes de `git push`, confira o remoto. Empurrar detalhe de operação para o público é o erro fácil.
+
 ```
+Dockerfile           imagem única (React compilado + API) para Render/Railway/Fly
+render.yaml          variáveis do deploy — sem nenhum segredo, o público lê isto
 docker-compose.yml   Postgres 16 — LEGADO, o app usa Postgres embutido (ver abaixo)
 backend/             FastAPI + SQLAlchemy 2 + Alembic (Python 3.13)
   run_server.py        entrada do .exe;  erp-frota-api.spec  receita do PyInstaller
@@ -71,8 +80,17 @@ Login: senha sorteada no 1º boot, em `%LOCALAPPDATA%\GM Locacoes\senha-inicial-
 4. **Nunca logar** senha, token, hash, CPF ou CNH. Nem em `logger.debug`, nem em mensagem de erro.
 5. **Nunca retornar `hashed_password`** em schema Pydantic de saída.
 6. **Dado de teste é inventado.** Nenhum motorista, placa ou CPF real em fixture, seed ou doc.
-7. O banco escuta só em `localhost` e sem senha (`-A trust`) porque é banco de uma máquina só.
-   Se um dia for exposto à rede, isso vira falha crítica — troque antes, não depois.
+7. **Dois modos, duas premissas.** No desktop, o banco escuta só em `localhost` e sem senha
+   (`-A trust`) porque é banco de uma máquina só. **Em nuvem isso não vale**: Supabase com
+   senha e SSL, `ENV=production`, e o boot falha sem `SECRET_KEY` forte e `ADMIN_PASSWORD`
+   (ver `config.py`). Nunca leve o `-A trust` para fora da máquina.
+8. **Em nuvem, disco de container é efêmero.** `STORAGE_BACKEND=supabase`, senão foto de
+   vistoria e contrato assinado somem no deploy seguinte. `SECRET_KEY` fixo por variável de
+   ambiente — sorteado a cada deploy deslogaria todo mundo.
+9. **Pooler do Supabase (6543) exige `prepare_threshold=None` e `NullPool`.** Ele reaproveita
+   conexões entre transações e derruba os prepared statements do psycopg. O erro é
+   `prepared statement "_pg3_0" does not exist`, intermitente e só sob carga. Já tratado em
+   `db/session.py`, detectado pelo host — não desfaça.
 
 ## Economia de contexto
 
