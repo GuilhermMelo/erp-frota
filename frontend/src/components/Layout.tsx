@@ -10,6 +10,7 @@ import {
   ShieldAlert,
   TrendingDown,
   TrendingUp,
+  UserCog,
   Users,
   Wrench,
 } from 'lucide-react'
@@ -32,6 +33,10 @@ const NAV = [
   { to: '/vistorias', label: 'Vistorias', icon: ClipboardCheck },
 ]
 
+// Fora do NAV comum: a API recusa GET /users para operador, então mostrar o item para
+// quem não é admin seria oferecer uma porta que abre num erro.
+const NAV_ADMIN = [{ to: '/usuarios', label: 'Usuários', icon: UserCog }]
+
 export function Layout() {
   const { user, logout } = useAuth()
 
@@ -52,7 +57,7 @@ export function Layout() {
         </div>
 
         <nav className="flex-1 space-y-0.5 overflow-y-auto p-3">
-          {NAV.map(({ to, label, icon: Icon, end }) => (
+          {[...NAV, ...(user?.role === 'admin' ? NAV_ADMIN : [])].map(({ to, label, icon: Icon, end }) => (
             <NavLink
               key={to}
               to={to}

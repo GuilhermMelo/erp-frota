@@ -115,11 +115,43 @@ tem CPF e CNH, e o repositório é público.
 **Não resolvido:** o backup depende de alguém lembrar de rodar. Agendamento automático (Task
 Scheduler, ou o próprio Electron ao fechar) não existe.
 
+### Tela de usuários — outro endpoint sem consumo
+
+Pedido: "cadastre um usuário demo pelo frontend". **Não dava:** `POST /users` e `PATCH /users`
+existiam sem tela nenhuma. Não havia `features/users/` nem rota `/usuarios` — o único consumo de
+`GET /users` era um lookup dentro da tela de vistoria.
+
+Criada a tela (`/usuarios`), visível só para admin — a API recusa `GET /users` para operador, e
+mostrar o item seria oferecer uma porta que abre num erro.
+
+Decisões:
+- **Não existe excluir usuário**, e a API também não oferece. Usuário se desativa. O log de
+  auditoria aponta para `actor_email`; apagar a linha deixaria o histórico órfão de contexto.
+- **O e-mail não é editável.** É por ele que a auditoria identifica quem fez o quê.
+- Senha em branco na edição = mantém a atual. Mandar `""` seria recusado pelo backend
+  (`min_length=8`) numa edição que nem queria trocar senha.
+- Aviso ao desativar ou rebaixar a **própria** conta de admin: é assim que o dono se tranca fora.
+
+`USR000003 / demo@erpfrota.com.br` criado pela tela, papel `operador`. Verificado por Playwright:
+o admin vê o item no menu, o demo entra, e o item "Usuários" **some** para quem é operador.
+
+### Demonstração: o banco `frota_demo` foi apagado
+
+Apagado a pedido. Antes disso, o gerador virou `scripts/seed_demo.py` (era um arquivo temporário
+que sumiria com a sessão) — sem ele, apagar o banco tornaria os dados fictícios irrecuperáveis.
+O script tem guard: recusa rodar contra a porta 8010, a da instalação de trabalho.
+
+**Ponto em aberto, importante:** o usuário demo **não tem isolamento de dados**. Os papéis limitam
+AÇÕES (19 endpoints exigem admin), não visibilidade — é um ERP de uma empresa só. Enquanto a base
+está vazia, tanto faz. Depois de cadastrar a frota real, **entrar como demo mostra CPF e CNH de
+motoristas de verdade**. Para demonstrar a terceiros, o caminho é o `seed_demo.py` num banco à
+parte, não o usuário demo.
+
 ### Pendências do mesmo tipo (mapeadas, não corrigidas)
 
 Contratos, manutenções e multas têm `PATCH`/`DELETE` na API **sem consumo no frontend** — o mesmo
-padrão que produziu este buraco. Vistoria não tem `DELETE` nem na API. Nenhum é tão grave quanto
-o do veículo (não mexem em `purchase_price`), mas são a mesma dívida.
+padrão que produziu estes dois buracos. Vistoria não tem `DELETE` nem na API. Nenhum é tão grave
+quanto o do veículo (não mexem em `purchase_price`), mas são a mesma dívida.
 
 ---
 

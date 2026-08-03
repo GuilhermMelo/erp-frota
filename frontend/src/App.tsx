@@ -14,6 +14,7 @@ import { InspectionsPage } from './features/inspections/InspectionsPage'
 import { MaintenancesPage } from './features/maintenances/MaintenancesPage'
 import { ReceivablesPage } from './features/revenues/ReceivablesPage'
 import { RevenuesPage } from './features/revenues/RevenuesPage'
+import { UsersPage } from './features/users/UsersPage'
 import { VehicleDetailPage } from './features/vehicles/VehicleDetailPage'
 import { VehiclesPage } from './features/vehicles/VehiclesPage'
 
@@ -43,6 +44,8 @@ export function App() {
             <Route path="multas" element={<FinesPage />} />
             <Route path="vistorias" element={<InspectionsPage />} />
             <Route path="vistorias/:id" element={<InspectionDetailPage />} />
+            {/* Só admin: a própria API recusa GET /users para operador. */}
+            <Route path="usuarios" element={<UsersPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
