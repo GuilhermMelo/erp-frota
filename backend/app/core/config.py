@@ -23,7 +23,10 @@ class Settings(BaseSettings):
     # NÃO use um domínio .local/.test/.invalid aqui: o login valida o e-mail com EmailStr,
     # que recusa domínios reservados — o admin do seed nunca conseguiria entrar.
     ADMIN_EMAIL: str = "admin@erpfrota.com.br"
-    ADMIN_PASSWORD: str = "admin123"
+    # Vazio de propósito. Senha padrão em código-fonte é senha PÚBLICA: vale para toda
+    # instalação que existir, e este repositório é aberto. Sem valor aqui, o seed sorteia
+    # a senha do primeiro admin e a entrega num arquivo (ver seed.py).
+    ADMIN_PASSWORD: str = ""
     ADMIN_NAME: str = "Administrador"
 
     @property

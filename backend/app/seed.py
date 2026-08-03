@@ -1,10 +1,13 @@
 """Dados iniciais. Idempotente: pode rodar a cada boot sem duplicar nada."""
 
 import logging
+import secrets
+from pathlib import Path
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core import paths
 from app.core.config import settings
 from app.core.security import hash_password
 from app.domains.expenses.models import ExpenseCategory
@@ -83,18 +86,42 @@ def seed(db: Session) -> None:
         if item is None:
             db.add(ChecklistItem(key=key, label=label, group_name=group, sort_order=order))
 
+    # Sem ADMIN_PASSWORD configurada, a senha do primeiro admin é SORTEADA. Uma senha
+    # padrão em código-fonte é senha pública — vale para toda instalação que existir.
+    senha_sorteada: str | None = None
     if db.scalar(select(User).limit(1)) is None:
-        if not settings.is_dev and settings.ADMIN_PASSWORD == "admin123":
-            logger.warning("Nenhum usuário e ADMIN_PASSWORD é o default. Admin NÃO criado.")
-        else:
-            db.add(
-                User(
-                    email=settings.ADMIN_EMAIL.strip().lower(),
-                    full_name=settings.ADMIN_NAME,
-                    hashed_password=hash_password(settings.ADMIN_PASSWORD),
-                    role=UserRole.admin,
-                )
+        senha_sorteada = None if settings.ADMIN_PASSWORD else secrets.token_urlsafe(18)
+        db.add(
+            User(
+                email=settings.ADMIN_EMAIL.strip().lower(),
+                full_name=settings.ADMIN_NAME,
+                hashed_password=hash_password(settings.ADMIN_PASSWORD or senha_sorteada),
+                role=UserRole.admin,
             )
-            logger.info("Admin criado: %s", settings.ADMIN_EMAIL)
+        )
+        logger.info("Admin criado: %s", settings.ADMIN_EMAIL)
 
     db.commit()
+
+    # Só DEPOIS do commit: entregar a senha de um usuário que não chegou a ser gravado
+    # mandaria o dono tentar um login que nunca vai funcionar.
+    if senha_sorteada:
+        logger.warning("Senha inicial do admin gravada em %s", _entregar_senha(senha_sorteada))
+
+
+def _entregar_senha(senha: str) -> Path:
+    """Grava a senha sorteada onde o dono consiga ler — não há outro canal.
+
+    O app é de desktop e roda sem console: um `logger.info` com a senha morreria num
+    arquivo de log que ninguém abre. O arquivo fica na pasta de dados do usuário e diz,
+    ele mesmo, para ser apagado.
+    """
+    arquivo = paths.initial_password_file()
+    arquivo.write_text(
+        "Senha inicial do administrador do GM Locacoes.\n\n"
+        f"E-mail: {settings.ADMIN_EMAIL}\n"
+        f"Senha:  {senha}\n\n"
+        "Troque a senha no primeiro acesso e APAGUE este arquivo.\n",
+        encoding="utf-8",
+    )
+    return arquivo

@@ -57,6 +57,16 @@ def installation_secret() -> str:
     return arquivo.read_text(encoding="utf-8").strip()
 
 
+def initial_password_file() -> Path:
+    """Onde a senha sorteada do primeiro admin é entregue ao dono.
+
+    Texto puro, na pasta do usuário — mesmo lugar e mesma proteção da `secret.key`. É pior
+    que um cofre e melhor que a alternativa que existia: uma senha fixa no código-fonte de
+    um repositório público. O próprio arquivo pede para ser apagado após o primeiro login.
+    """
+    return data_dir() / "senha-inicial-admin.txt"
+
+
 def migrations_dir() -> Path:
     return resource_dir() / "migrations"
 
