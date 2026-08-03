@@ -78,9 +78,13 @@ desde o primeiro carro.*
 
 ![Lista de veículos](docs/img/veiculos.png)
 
-*A frota inteira com o lucro de cada carro na última coluna. Aqui a frota de demonstração cobre os
-quatro estados que importam: um que já se pagou, um ainda em formação, um vendido com o ciclo
-fechado e um comprado na semana passada — o caso em que ROI e custo/km dividiriam por zero.*
+*A frota inteira com o lucro de cada carro na última coluna. A frota de demonstração cobre os
+quatro estados que importam: um quase no ponto de equilíbrio, um ainda em formação, um vendido com
+o ciclo fechado e um comprado na semana passada — o caso em que ROI e custo/km dividiriam por zero.*
+
+O CAR000001 é o exemplo que amarra as duas telas seguintes: está a **R$ 640 de se pagar** e tem
+**R$ 1.550 em aberto**. Ele já estaria no azul se o motorista estivesse em dia — e é por isso que
+cobrança em aberto **nunca** entra no lucro. Contar dinheiro que não entrou é como a planilha mente.
 
 ![Cobranças e inadimplência](docs/img/cobrancas.png)
 

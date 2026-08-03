@@ -39,6 +39,66 @@ Nenhuma bloqueia o uso.
 
 ---
 
+## Sessão 5 — 2026-08-03
+
+Edição de veículo. O fluxo de cadastro estava incompleto e ninguém tinha percebido.
+
+### O buraco
+
+`PATCH /vehicles/{id}` existia desde o começo, aceitando placa, marca, ano, odômetro e
+`purchase_price`. O frontend consumia esse endpoint **para um campo só** — o valor de mercado
+estimado, do bloco "Se eu vender hoje". Não havia botão "Editar" em lugar nenhum.
+
+Na prática: digitar R$ 68.500 onde era R$ 86.500 e não ter conserto pela interface. E o valor de
+compra é um dos quatro termos da equação do lucro. Violava a regra 5 deste projeto — endpoint
+escrito, consumo não.
+
+Descoberto ao responder "para criar o cadastro o fluxo está completo?" **antes** de cadastrar a
+frota real. Se a pergunta viesse depois, o conserto seria por SQL.
+
+### Como ficou
+
+O mesmo formulário de "Novo veículo" agora serve os dois modos (`VehicleFormModal`), como
+`DriversPage` e `ExpensesPage` já faziam. Botão "Editar" na tela do veículo.
+
+Alterar o valor de compra mostra um aviso: **reescreve o lucro do carro**, e o histórico já
+calculado muda junto. Não bloqueia — corrigir erro de digitação é exatamente o objetivo da tela —
+mas o operador não faz isso sem saber.
+
+Um detalhe que teria virado bug: o formulário monta antes de o veículo chegar da API. Sem
+`reset()` no `useEffect`, abrir a edição mostraria campos vazios.
+
+### Achado do lado do backend
+
+O `PATCH` **aceitava odômetro atual menor que o de compra**. A regra existia só no zod do
+formulário; quem chamasse a API direto passava por cima. Consequência silenciosa: `km_driven`
+negativo, e `custo_por_km` sumindo da tela sem explicação. Fechado no router, com 409.
+
+### Verificado
+
+`tests/test_vehicles.py`, 7 testes novos — inclusive o que garante que corrigir `purchase_price`
+**reescreve o lucro** (se a conta não acompanhasse, a edição seria só cosmética) e o que confirma
+que a edição entra no log de auditoria. Suíte completa: **120 passando**.
+
+Ponta a ponta pela interface (Playwright, contra `frota_demo`): botão aparece, formulário abre
+preenchido, o aviso só surge quando o preço muda, salvar fecha o modal e o lucro recalcula —
+variação de exatamente R$ 1.500 para uma mudança de R$ 1.500 no valor de compra.
+
+### Correção de registro
+
+O commit `8e42e1e` descreve o CAR000001 como "um carro que já se pagou (payback em 29 meses)".
+Isso valia para a **primeira** leva de dados de demonstração. Depois de refazer o seed deixando
+cobranças vencidas, o mesmo carro ficou em `-R$ 640,16`, com payback estimado em ~2 meses. As
+legendas do README foram corrigidas; a mensagem do commit ficou como está.
+
+### Pendências do mesmo tipo (mapeadas, não corrigidas)
+
+Contratos, manutenções e multas têm `PATCH`/`DELETE` na API **sem consumo no frontend** — o mesmo
+padrão que produziu este buraco. Vistoria não tem `DELETE` nem na API. Nenhum é tão grave quanto
+o do veículo (não mexem em `purchase_price`), mas são a mesma dívida.
+
+---
+
 ## Sessão 4 — 2026-08-03
 
 Projeto clonado numa máquina nova. Ambiente montado do zero e auditoria de segurança do
