@@ -46,19 +46,21 @@ Nenhuma bloqueia o uso.
 
 Ida para a nuvem: Supabase como banco, Render/Railway como hospedagem.
 
-### Decisão: dois repositórios
+### Decisão: este repositório é portfólio; a produção é outro sistema
 
-O público (`erp-frota`) vira **instantâneo de portfólio** e congela. O real passa a viver num
-repositório **privado**, com todo o histórico.
+Levantada a hipótese de mover este projeto para um repositório privado. **Descartada** ao
+descobrir o quadro real: existe um segundo sistema, `gm-locacoes` — reescrita em Node/TypeScript
+(Fastify + Prisma + React + React Native), privada, **já publicada e rodando com Supabase**.
 
-Vale registrar o que foi discutido, porque a premissa merece cuidado: **repositório público não
-impede o sistema de rodar a operação real** — o trabalho da Sessão 4 (nenhum segredo no código,
-senha sorteada, tudo por variável de ambiente) existe exatamente para isso. O que não pode
-vazar são dados e credenciais, e esses nunca estiveram no Git. A escolha pelo privado é sobre
-não publicar a lógica de negócio daqui em diante, não sobre segurança de credencial.
+A reescrita foi decisão do dono (TypeScript em toda a stack e app Android nativo), não falha
+deste projeto. Este repositório fica **público, como portfólio, e continua sendo a fonte das
+regras de negócio**: as armadilhas do `CLAUDE.md` foram descobertas aqui, com dado real, e o
+`CLAUDE.md` do outro repositório manda ler este antes de projetar qualquer módulo financeiro.
 
-**Antes de `git push`, confira o remoto.** Empurrar detalhe de operação para o público é o erro
-fácil deste arranjo.
+Vale registrar o que se discutiu, porque a premissa merece cuidado: **repositório público não
+impede um sistema de rodar operação real.** O trabalho da Sessão 4 — nenhum segredo no código,
+senha sorteada, tudo por variável de ambiente — existe exatamente para isso. O que não pode
+vazar são dados e credenciais, e esses nunca estiveram no Git.
 
 ### Quatro coisas quebravam ao sair da máquina — todas em silêncio
 
@@ -99,9 +101,10 @@ que sobe duas instâncias não dispara dois `alembic upgrade` concorrentes.
 
 ### Pendente
 
-Criar o projeto no Supabase, o bucket `arquivos` (privado) e o repositório privado. O banco local
-tem 0 veículos e 0 motoristas — **não há dado para migrar**, o que torna este o melhor momento
-possível para a mudança.
+O suporte a Supabase e ao deploy está pronto e testado, mas **não há decisão de publicar este
+sistema**: quem foi para a nuvem foi o `gm-locacoes`. Aqui o trabalho vale como o que é — a
+demonstração de como a migração seria feita, com os quatro problemas silenciosos identificados e
+resolvidos antes de existirem.
 
 ### Ainda não resolvido
 

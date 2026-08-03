@@ -11,12 +11,18 @@ bonita que seja.
 
 ## Arquitetura
 
-**Dois repositórios, de propósito:**
+**Este repositório é o primeiro sistema, e é peça de portfólio — público, de propósito.**
 
-- `erp-frota` (**público**) — instantâneo de portfólio. Congelado; só atualiza quando decidido.
-- repositório **privado** — o projeto real, com todo o histórico. É para onde vão os commits.
+Existe um **segundo** sistema, `gm-locacoes`: uma reescrita em Node/TypeScript (Fastify + Prisma
++ React + React Native), privada, e é ela que está em produção. A reescrita foi decisão do dono —
+TypeScript em toda a stack e app Android nativo —, **não falha deste projeto**: este chegou a 12
+domínios, 43 endpoints e rodou com dado real.
 
-Antes de `git push`, confira o remoto. Empurrar detalhe de operação para o público é o erro fácil.
+Consequência prática: **este repositório é a fonte das regras de negócio.** As armadilhas listadas
+no fim deste arquivo custaram sessões inteiras e foram descobertas aqui, com dado real. Reescrever
+não é motivo para redescobrir.
+
+Não há mescla entre os dois: linguagens diferentes, históricos sem ancestral comum.
 
 ```
 Dockerfile           imagem única (React compilado + API) para Render/Railway/Fly
