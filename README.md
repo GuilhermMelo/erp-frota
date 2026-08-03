@@ -87,6 +87,12 @@ O CAR000001 é o exemplo que amarra as duas telas seguintes: está a **R$ 640 de
 **R$ 1.550 em aberto**. Ele já estaria no azul se o motorista estivesse em dia — e é por isso que
 cobrança em aberto **nunca** entra no lucro. Contar dinheiro que não entrou é como a planilha mente.
 
+![Editar veículo](docs/img/editar-veiculo.png)
+
+*Corrigir o valor de compra é permitido — erro de digitação na migração da planilha é justamente
+o caso de uso. Mas o campo avisa o que está em jogo: aquele número é um dos quatro termos da
+equação, e mudá-lo reescreve o resultado histórico do carro. Avisar em vez de bloquear.*
+
 ![Cobranças e inadimplência](docs/img/cobrancas.png)
 
 *Inadimplência não é um campo no banco: é `status IN ('pending','partial') AND due_date < hoje`,
