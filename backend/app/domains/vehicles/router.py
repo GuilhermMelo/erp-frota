@@ -118,6 +118,17 @@ def update_vehicle(vehicle_id: UUID, data: VehicleUpdate, db: Db, _: CurrentUser
         exclude_id=vehicle.id,
     )
 
+    # Odômetro só anda para frente. Ao contrário, `km_driven` fica negativo e `custo_por_km`
+    # some da tela (a API devolve NULL) sem ninguém entender por quê. A validação existia só
+    # no formulário; aqui ela vale também para quem chama a API direto.
+    # Conferido ANTES do setattr: a sessão não pode ficar com alteração pendente ao levantar.
+    atual = fields.get("current_odometer", vehicle.current_odometer)
+    compra = fields.get("purchase_odometer", vehicle.purchase_odometer)
+    if atual < compra:
+        raise Conflict(
+            f"O odômetro atual ({atual} km) não pode ser menor que o da compra ({compra} km)."
+        )
+
     for key, value in fields.items():
         setattr(vehicle, key, value)
 

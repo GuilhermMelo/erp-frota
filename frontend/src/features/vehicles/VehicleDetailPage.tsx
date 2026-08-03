@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react'
 
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, ExternalLink, TriangleAlert } from 'lucide-react'
+import { ArrowLeft, ExternalLink, Pencil, TriangleAlert } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { Link, useParams } from 'react-router-dom'
 import { z } from 'zod'
@@ -37,6 +37,7 @@ import {
   today,
 } from '../../lib/format'
 import { useAuth } from '../auth/AuthContext'
+import { VehicleFormModal } from './VehiclesPage'
 import {
   CONTRACT_STATUS,
   EXPENSE_STATUS,
@@ -686,6 +687,7 @@ export function VehicleDetailPage() {
   const { user } = useAuth()
   const [ledger, setLedger] = useState<Ledger>(null)
   const [sellOpen, setSellOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
 
   const vehicle = useQuery({
     queryKey: ['vehicles', id],
@@ -745,6 +747,10 @@ export function VehicleDetailPage() {
               label={badge?.label ?? v.status}
               className={badge?.className ?? 'bg-slate-100 text-slate-500'}
             />
+            <Button variant="secondary" onClick={() => setEditOpen(true)}>
+              <Pencil size={16} />
+              Editar
+            </Button>
             {!isSold && user?.role === 'admin' && (
               <Button variant="danger" onClick={() => setSellOpen(true)}>
                 Vender veículo
@@ -919,6 +925,8 @@ export function VehicleDetailPage() {
         total={ledger ? totalForLedger[ledger] : undefined}
         onClose={() => setLedger(null)}
       />
+
+      <VehicleFormModal open={editOpen} onClose={() => setEditOpen(false)} vehicle={v} />
 
       {!isSold && <SellModal open={sellOpen} onClose={() => setSellOpen(false)} vehicle={v} />}
     </>

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus, Search } from 'lucide-react'
+import { Plus, Search, TriangleAlert } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { z } from 'zod'
@@ -121,35 +121,94 @@ const EMPTY: VehicleForm = {
   current_odometer: '0',
 }
 
-function NewVehicleModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+/** O veículo salvo de volta no formato do formulário (tudo string, dinheiro inclusive). */
+function toForm(v: Vehicle): VehicleForm {
+  return {
+    plate: v.plate,
+    brand: v.brand,
+    model: v.model,
+    version: v.version ?? '',
+    manufacture_year: String(v.manufacture_year),
+    model_year: String(v.model_year),
+    color: v.color ?? '',
+    fuel_type: v.fuel_type,
+    renavam: v.renavam ?? '',
+    chassi: v.chassi ?? '',
+    purchase_date: v.purchase_date,
+    purchase_price: v.purchase_price,
+    purchase_odometer: String(v.purchase_odometer),
+    current_odometer: String(v.current_odometer),
+  }
+}
+
+/**
+ * Cadastro e correção de veículo — o MESMO formulário nos dois modos.
+ *
+ * Sem `vehicle`, cria. Com `vehicle`, corrige (PATCH). Editar não é conforto: o valor de
+ * compra é um dos quatro termos do lucro, e sem esta tela um dígito errado na migração da
+ * planilha só teria conserto por SQL.
+ */
+export function VehicleFormModal({
+  open,
+  onClose,
+  vehicle,
+}: {
+  open: boolean
+  onClose: () => void
+  vehicle?: Vehicle
+}) {
   const queryClient = useQueryClient()
+  const isEdit = vehicle !== undefined
+  const inicial = vehicle ? toForm(vehicle) : EMPTY
+
   const {
     register,
     handleSubmit,
     reset,
+    watch,
     formState: { errors },
-  } = useForm<VehicleForm>({ resolver: zodResolver(vehicleSchema), defaultValues: EMPTY })
+  } = useForm<VehicleForm>({ resolver: zodResolver(vehicleSchema), defaultValues: inicial })
 
-  const create = useMutation({
+  // O formulário monta antes de o veículo chegar da API — sem isto, abrir a edição
+  // mostraria os campos vazios.
+  useEffect(() => {
+    if (open) reset(inicial)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, vehicle?.id])
+
+  const salvar = useMutation({
     mutationFn: (values: VehicleForm) =>
-      api.post<Vehicle>('/vehicles', toPayload(values)).then((r) => r.data),
+      (isEdit
+        ? api.patch<Vehicle>(`/vehicles/${vehicle.id}`, toPayload(values))
+        : api.post<Vehicle>('/vehicles', toPayload(values))
+      ).then((r) => r.data),
     onSuccess: () => {
+      // ['vehicles'] casa por prefixo com ['vehicles', id] — a tela de detalhe recarrega junto.
       queryClient.invalidateQueries({ queryKey: ['vehicles'] })
       queryClient.invalidateQueries({ queryKey: ['finance'] })
-      reset(EMPTY)
+      reset(inicial)
       onClose()
     },
   })
 
+  // Mesma comparação que o backend faz: string de dinheiro normalizada, nunca float.
+  const precoMudou =
+    isEdit && watch('purchase_price').trim().replace(',', '.') !== vehicle.purchase_price
+
   function close() {
-    create.reset()
-    reset(EMPTY)
+    salvar.reset()
+    reset(inicial)
     onClose()
   }
 
   return (
-    <Modal open={open} onClose={close} title="Novo veículo" wide>
-      <form onSubmit={handleSubmit((v) => create.mutate(v))} className="space-y-5">
+    <Modal
+      open={open}
+      onClose={close}
+      title={isEdit ? `Editar veículo ${vehicle.code}` : 'Novo veículo'}
+      wide
+    >
+      <form onSubmit={handleSubmit((v) => salvar.mutate(v))} className="space-y-5">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Field label="Placa" error={errors.plate?.message} required>
             <Input placeholder="ABC1D23" {...register('plate')} />
@@ -215,16 +274,27 @@ function NewVehicleModal({ open, onClose }: { open: boolean; onClose: () => void
               <Input type="number" {...register('current_odometer')} />
             </Field>
           </div>
+
+          {precoMudou && (
+            <div className="mt-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+              <TriangleAlert size={16} className="mt-0.5 shrink-0" />
+              <span>
+                O valor de compra estava <strong>{formatMoney(vehicle.purchase_price)}</strong>.
+                Alterá-lo <strong>reescreve o lucro deste carro</strong> — o histórico já
+                calculado muda junto. Confira antes de salvar.
+              </span>
+            </div>
+          )}
         </div>
 
-        {create.isError && <ErrorBox message={errorMessage(create.error)} />}
+        {salvar.isError && <ErrorBox message={errorMessage(salvar.error)} />}
 
         <div className="flex justify-end gap-2">
           <Button type="button" variant="secondary" onClick={close}>
             Cancelar
           </Button>
-          <Button type="submit" loading={create.isPending}>
-            Cadastrar veículo
+          <Button type="submit" loading={salvar.isPending}>
+            {isEdit ? 'Salvar alterações' : 'Cadastrar veículo'}
           </Button>
         </div>
       </form>
@@ -412,7 +482,7 @@ export function VehiclesPage() {
         </Table>
       )}
 
-      <NewVehicleModal open={modalOpen} onClose={() => setModalOpen(false)} />
+      <VehicleFormModal open={modalOpen} onClose={() => setModalOpen(false)} />
     </>
   )
 }
