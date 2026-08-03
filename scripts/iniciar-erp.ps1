@@ -1,25 +1,33 @@
-# Abre o ERP Frota nesta máquina: garante o banco de pé, sobe o backend e abre o navegador.
+# Abre o GM Locações nesta máquina: sobe o banco, o servidor e o navegador.
 #
-# Não deve ser executado direto — use o atalho "ERP Frota" (ou o ERP Frota.cmd na raiz).
+# Não rode direto — use o "GM Locações.cmd" na raiz (ou o atalho na área de trabalho).
+#
+# ---------------------------------------------------------------------------
+# O DOCKER SAIU DAQUI. Este script subia o Postgres com `docker compose up` e exigia o
+# Docker Desktop instalado e rodando. Hoje o banco é um Postgres PORTÁTIL que vive em
+# `desktop/vendor/pgsql` e sobe como processo comum: nada para instalar, nada para manter
+# ligado, nenhuma camada de virtualização entre o app e o disco.
+#
+# O `docker-compose.yml` foi removido do projeto. Se um dia alguém quiser voltar, ele está
+# no histórico do git — mas a premissa mudou: este é um sistema de UMA máquina, e o Docker
+# custava um pré-requisito pesado para quem só quer abrir o programa.
+# ---------------------------------------------------------------------------
 
-# NÃO usar ErrorActionPreference = "Stop" aqui. O `docker info` escreve avisos inofensivos
-# no stderr ("No blkio throttle support"), e o PowerShell 5.1 transforma stderr de programa
-# externo em erro fatal — o script morreria com o Docker funcionando perfeitamente.
-# Aqui se olha o código de saída, que é o que de fato diz se o comando deu certo.
+# NÃO usar ErrorActionPreference = "Stop". No PowerShell 5.1, qualquer coisa que um programa
+# externo escreva em stderr — inclusive aviso inofensivo — vira erro fatal, e o script
+# morreria com tudo funcionando. Aqui se olha o código de saída, que é o que de fato importa.
 $ErrorActionPreference = "Continue"
 
 $RAIZ = Split-Path -Parent $PSScriptRoot
+$PG = Join-Path $RAIZ "desktop\vendor\pgsql\bin"
+$DADOS = Join-Path $env:LOCALAPPDATA "GM Locacoes"
+$PGDATA = Join-Path $DADOS "pgdata"
 $EXE = Join-Path $RAIZ "backend\dist\erp-frota-api\erp-frota-api.exe"
 $PORTA = 8010
 $URL = "http://127.0.0.1:$PORTA"
-$LOG = Join-Path $env:LOCALAPPDATA "ERP Frota\logs\backend.log"
+$LOG = Join-Path $DADOS "logs\backend.log"
 
 function Escreva($texto) { Write-Host $texto }
-
-function Docker-De-Pe {
-    docker info > $null 2> $null
-    return $LASTEXITCODE -eq 0
-}
 
 function Backend-Responde {
     try {
@@ -28,11 +36,19 @@ function Backend-Responde {
     } catch { return $false }
 }
 
-# Já está aberto? Só traz o navegador de volta — abrir o .exe duas vezes daria "porta em uso".
+# Já está aberto? Só traz o navegador de volta — abrir duas vezes daria "porta em uso".
 if (Backend-Responde) {
-    Escreva "ERP ja esta rodando."
+    Escreva "O GM Locacoes ja esta rodando."
     Start-Process $URL
     exit 0
+}
+
+if (-not (Test-Path (Join-Path $PG "pg_ctl.exe"))) {
+    Escreva "ERRO: o Postgres portatil nao esta em desktop\vendor\pgsql." -ForegroundColor Red
+    Escreva "Baixe uma vez (~300 MB, fora do git):"
+    Escreva "  https://get.enterprisedb.com/postgresql/postgresql-16.10-1-windows-x64-binaries.zip"
+    Read-Host "ENTER para fechar"
+    exit 1
 }
 
 if (-not (Test-Path $EXE)) {
@@ -42,29 +58,42 @@ if (-not (Test-Path $EXE)) {
     exit 1
 }
 
-# 1. O banco. O container tem restart:unless-stopped, entao normalmente ja esta de pe --
-#    mas se o Docker Desktop acabou de ligar, ele leva alguns segundos.
-Escreva "Verificando o banco de dados..."
-if (-not (Docker-De-Pe)) {
-    Escreva "Docker nao esta rodando. Abrindo o Docker Desktop (demora ~30s na primeira vez)..."
-    Start-Process "$env:ProgramFiles\Docker\Docker\Docker Desktop.exe"
-    foreach ($i in 1..60) {
-        Start-Sleep -Seconds 2
-        if (Docker-De-Pe) { break }
+# 1. O banco. Só em localhost: é banco de uma máquina só, e sem senha (-A trust) justamente
+#    porque nada de fora alcança a porta.
+$bancoDePe = Test-NetConnection -ComputerName 127.0.0.1 -Port 5434 -InformationLevel Quiet -WarningAction SilentlyContinue
+if (-not $bancoDePe) {
+    Escreva "Iniciando o banco de dados..."
+
+    if (-not (Test-Path (Join-Path $PGDATA "PG_VERSION"))) {
+        Escreva "Primeira execucao: preparando o banco (demora alguns segundos)..."
+        New-Item -ItemType Directory -Force $DADOS | Out-Null
+        & "$PG\initdb.exe" -D $PGDATA -U frota -A trust -E UTF8 --locale=C > $null 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            Escreva "ERRO: nao consegui preparar o banco."
+            Read-Host "ENTER para fechar"
+            exit 1
+        }
     }
-    if (-not (Docker-De-Pe)) {
-        Escreva "ERRO: o Docker nao subiu. Abra o Docker Desktop na mao e tente de novo."
+
+    # A saída vai para ARQUIVO, nunca para um pipe: o servidor herda o handle de stdout e,
+    # canalizado no PowerShell, o pipeline nunca fecha — o banco sobe e o script trava.
+    & "$PG\pg_ctl.exe" -D $PGDATA -l (Join-Path $PGDATA "postgres.log") `
+        -o "-p 5434 -c listen_addresses=localhost" -w -t 60 start > $null 2>&1
+
+    # O banco lógico não vem do initdb. Criar sempre e ignorar "já existe" é a forma
+    # idempotente de garantir que ele exista sem uma checagem a mais.
+    & "$PG\createdb.exe" -h 127.0.0.1 -p 5434 -U frota frota > $null 2>&1
+
+    $bancoDePe = Test-NetConnection -ComputerName 127.0.0.1 -Port 5434 -InformationLevel Quiet -WarningAction SilentlyContinue
+    if (-not $bancoDePe) {
+        Escreva "ERRO: o banco nao subiu. Veja $PGDATA\postgres.log"
         Read-Host "ENTER para fechar"
         exit 1
     }
 }
 
-Push-Location $RAIZ
-docker compose up -d | Out-Null
-Pop-Location
-
-# 2. O backend. Ele roda as migracoes sozinho no boot e serve a interface na mesma porta.
-Escreva "Subindo o sistema..."
+# 2. O backend. Ele roda as migrações sozinho no boot e serve a interface na mesma porta.
+Escreva "Abrindo o sistema..."
 Start-Process $EXE -WindowStyle Hidden
 
 foreach ($i in 1..45) {
@@ -76,7 +105,7 @@ foreach ($i in 1..45) {
     Start-Sleep -Seconds 1
 }
 
-# Sem console, o .exe nao tem onde reclamar. O log e a unica pista.
+# Sem console, o .exe não tem onde reclamar. O log é a única pista.
 Escreva ""
 Escreva "ERRO: o sistema nao respondeu em 45s."
 Escreva "O que aconteceu esta no log: $LOG"

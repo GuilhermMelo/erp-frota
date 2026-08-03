@@ -25,9 +25,6 @@ não é motivo para redescobrir.
 Não há mescla entre os dois: linguagens diferentes, históricos sem ancestral comum.
 
 ```
-Dockerfile           imagem única (React compilado + API) para Render/Railway/Fly
-render.yaml          variáveis do deploy — sem nenhum segredo, o público lê isto
-docker-compose.yml   Postgres 16 — LEGADO, o app usa Postgres embutido (ver abaixo)
 backend/             FastAPI + SQLAlchemy 2 + Alembic (Python 3.13)
   run_server.py        entrada do .exe;  erp-frota-api.spec  receita do PyInstaller
   app/core/            config · errors · security · context · storage · paths
@@ -36,7 +33,16 @@ backend/             FastAPI + SQLAlchemy 2 + Alembic (Python 3.13)
 frontend/            React 19 + TS + Vite + Tailwind + TanStack Query
 desktop/             Electron: Postgres embutido -> backend -> janela
   vendor/pgsql/        Postgres portátil (fora do git, ~300 MB, baixado uma vez)
+scripts/             iniciar-erp · web · backup · demo · seed_demo
+Dockerfile           imagem única (React compilado + API) para Render/Railway/Fly
+render.yaml          variáveis do deploy — sem nenhum segredo, o público lê isto
 ```
+
+**O Docker acabou.** O banco era um container (`docker-compose.yml`) e hoje é o Postgres
+portátil de `desktop/vendor/pgsql`, que sobe como processo comum. O arquivo foi **removido** —
+está no histórico do git se um dia fizer falta. Não o traga de volta sem motivo: ele custava um
+pré-requisito pesado (Docker Desktop instalado e rodando) para quem só quer abrir o programa,
+e este é um sistema de uma máquina só.
 
 **Portas:** 5434 banco · 8010 API · 5273 Vite. Não são as padrão de propósito — 5432/5433, 8000
 e 5173 já estão ocupadas por outros projetos.
@@ -55,6 +61,15 @@ cd frontend && npm run dev
 
 Login: senha sorteada no 1º boot, em `%LOCALAPPDATA%\GM Locacoes\senha-inicial-admin.txt`.
 
+Os quatro scripts, e quando usar cada um:
+
+| | |
+|---|---|
+| `iniciar-erp.ps1` | abre o sistema nesta máquina (o `GM Locações.cmd` chama este) |
+| `web.ps1` | expõe na rede local, para acessar do celular — **HTTP, só rede de casa** |
+| `demo.ps1` | vitrine isolada na 8011, banco próprio, apagado ao sair |
+| `backup.ps1 -Verificar` | copia banco **e** arquivos, e prova que a cópia restaura |
+
 ## Regras permanentes
 
 1. **Dinheiro é `Decimal` / `Numeric(12,2)`. NUNCA `float`.** Em ERP financeiro, `float` é bug
@@ -67,7 +82,12 @@ Login: senha sorteada no 1º boot, em `%LOCALAPPDATA%\GM Locacoes\senha-inicial-
    (`vehicles.purchase_price`, `vehicles.sale_price`, `contracts.deposit_amount`). Criar
    categoria de receita para venda ou caução conta o lucro em dobro. Decidido — não reintroduzir.
    A caução vira receita (`caucao_retida`) só na parte retida ao encerrar o contrato.
-5. Ao adicionar endpoint, adicione o consumo no frontend e teste ponta a ponta na mesma sessão.
+5. **Endpoint sem consumo no frontend é endpoint NÃO ENTREGUE.** Adicione a tela e teste ponta a
+   ponta na mesma sessão. Não é formalidade: em duas sessões apareceram **três** casos —
+   `PATCH /vehicles` (dava para corrigir o valor de compra só por SQL), `POST /users` (não havia
+   tela de usuários) e, no outro sistema, `POST /files` (nenhum `input type="file"` existia).
+   Ninguém percebe porque nada quebra: a funcionalidade simplesmente não existe.
+   **Ainda em aberto aqui:** contratos, manutenções e multas têm `PATCH`/`DELETE` sem tela.
 6. **Ao final de CADA sessão, atualize o `BACKLOG.md`** (data, o que foi feito, decisões, pendências).
 7. Peça confirmação antes de ação destrutiva (deletar, force-push, `alembic downgrade`).
 8. Identificadores em inglês; comentários e UI em português. Commits `tipo: descrição` em
@@ -105,11 +125,28 @@ O que mantém uma sessão barata neste repo:
 - **Não leia arquivo inteiro.** `Grep` para achar, `Read` com `offset`/`limit` na faixa. Os
   domínios são pequenos e repetitivos: ler um `router.py` já ensina o padrão dos outros.
 - **Não rode a suíte toda para validar um domínio.** `pytest tests/test_money.py -q`. A suíte
-  completa (113 testes, ~50 s) fica para o fim da sessão.
+  completa (177 testes, ~75 s) fica para o fim da sessão.
+- **`npm run build` é a verificação que vale**, não `tsc --noEmit`. O build roda `tsc -b`, que é
+  mais estrito e pega erro que o `--noEmit` deixa passar (aconteceu com uma união de tipos).
 - **Nunca leia** `package-lock.json`, `desktop/vendor/`, `.venv/`, `node_modules/`, `dist/`.
 - **Não repita aqui o que já está no código.** Este arquivo entra no contexto toda sessão; ele
   guarda o que NÃO dá para descobrir lendo o repositório — decisões e armadilhas.
 - **Uma entrada por sessão no BACKLOG**, curta. Histórico antigo se condensa, não se acumula.
+
+## Teste verde que não testa nada é pior que teste nenhum
+
+Numa sessão só, três testes foram escritos que passavam sem provar coisa alguma. Antes de
+comemorar um teste novo que passou de primeira, **desconfie**:
+
+- **Instrumentação desligada.** Um contador de consultas do Prisma lia sempre zero, porque o
+  cliente não emitia evento de `query`. `0 <= 0 + 2` passava.
+- **Passar por ausência.** Um teste afirmava que certa consulta *não* montava um `IN` com ids —
+  e passaria também se a consulta nem acontecesse. A cura é exigir antes que a coisa tenha
+  acontecido.
+- **Asserção sobre campo inexistente.** `assert.equal(x.netCost, ...)` com `netCost` `undefined`
+  falha por engano, não por bug — e a versão "corrigida" com `?? 0` teria passado sempre.
+
+**Se um teste passa de primeira, quebre o código de propósito e confirme que ele falha.**
 
 ## Armadilhas mapeadas (não recaia)
 

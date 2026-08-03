@@ -149,10 +149,47 @@ A suíte roda como dono do banco e enxerga tudo. A conferência está escrita no
 `criar_tenant.sql` — conectar como o papel e exigir `permission denied` em
 `SELECT count(*) FROM public.vehicles`. **Não publicar a credencial antes de ver o erro.**
 
+### O Docker acabou
+
+O repositório mostrava **dois caminhos de execução e um estava morto**: o `GM Locações.cmd`
+chamava o `scripts/iniciar-erp.ps1`, que subia o banco com `docker compose` — coisa que o app não
+faz desde que o Postgres virou portátil.
+
+`iniciar-erp.ps1` reescrito para o Postgres de `desktop/vendor/pgsql`: `initdb` na primeira vez,
+`pg_ctl` depois, e a saída sempre para **arquivo** — canalizada num pipe do PowerShell, o servidor
+herda o handle de stdout, o pipeline nunca fecha e o script trava com o banco de pé.
+
+`docker-compose.yml` **removido**. Continua no histórico do git se fizer falta, mas a premissa
+mudou: ele custava um pré-requisito pesado (Docker Desktop instalado e rodando) para quem só quer
+abrir o programa, e este é um sistema de uma máquina só.
+
+### CLAUDE.md refatorado
+
+Três mudanças que valem mais que a arrumação:
+
+1. **A regra 5 ganhou dentes.** Era "ao adicionar endpoint, adicione o consumo no frontend". Agora
+   diz **por que** — em duas sessões apareceram três violações: `PATCH /vehicles` (corrigir valor
+   de compra só por SQL), `POST /users` (não havia tela) e, no outro sistema, `POST /files`
+   (nenhum `input type="file"` existia). E registra o que segue aberto aqui: contratos,
+   manutenções e multas têm `PATCH`/`DELETE` sem tela.
+2. **Seção nova: "teste verde que não testa nada é pior que teste nenhum"**, com os três casos
+   reais desta sessão — instrumentação desligada, passar por ausência, asserção sobre campo
+   inexistente. A regra prática: se um teste passa de primeira, quebre o código de propósito e
+   confirme que ele falha.
+3. **`npm run build` é a verificação que vale**, não `tsc --noEmit` — o build roda `tsc -b`, mais
+   estrito, e pegou um erro que o `--noEmit` deixou passar.
+
+Mais a tabela dos quatro scripts (`iniciar-erp`, `web`, `demo`, `backup`) e a contagem de testes
+corrigida de 113 para 177.
+
 ### Ainda não resolvido
 
 **LGPD muda de figura.** CPF e CNH sairão da máquina do dono para a nuvem de um terceiro. Escolher
 a região São Paulo do Supabase e registrar o contrato de tratamento de dados.
+
+**Endpoints sem tela:** contratos, manutenções e multas têm `PATCH`/`DELETE` na API sem consumo no
+frontend. É a mesma dívida que já produziu três buracos — só não é tão grave porque nenhum deles
+mexe em `purchase_price`.
 
 ---
 
