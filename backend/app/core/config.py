@@ -19,6 +19,21 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+psycopg://frota:frota@localhost:5434/frota"
     CORS_ORIGINS: str = "http://localhost:5273"
 
+    # --- Tenant -----------------------------------------------------------------
+    # O schema do Postgres onde este processo vive. Vazio = `public` (desenvolvimento).
+    #
+    #   projeto Supabase PRIVADO  ->  DB_SCHEMA=gm     dados reais
+    #   projeto Supabase DEMO     ->  DB_SCHEMA=demo   dados inventados
+    #
+    # São bancos separados, então a vitrine já não alcança o dado real por não ter as
+    # credenciais dele. O schema mais o papel restrito (scripts/criar_tenant.sql) são a
+    # SEGUNDA camada: se alguém apontar a vitrine para o banco errado, o papel não tem
+    # permissão e a conexão falha — em vez de vazar.
+    #
+    # Tenant por coluna (`tenant_id` + WHERE em toda consulta) foi descartado: dependeria
+    # de nunca esquecer um filtro, em 13 modelos, para sempre.
+    DB_SCHEMA: str = ""
+
     # --- Arquivos (CNH, contratos, fotos de vistoria) ---------------------------
     # "local" grava em disco; "supabase" grava no Storage do Supabase.
     # Em hospedagem sem volume (Render, Railway) o disco do container SOME a cada

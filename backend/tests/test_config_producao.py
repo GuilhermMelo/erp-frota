@@ -130,5 +130,26 @@ def test_conexao_direta_mantem_o_pool_normal(url, monkeypatch):
     """Porta 5432 é conexão direta: pool do SQLAlchemy é o certo, e prepared
     statement é ganho de desempenho que não há motivo para abrir mão."""
     monkeypatch.setattr(settings, "DATABASE_URL", url)
+    monkeypatch.setattr(settings, "DB_SCHEMA", "")
     kw = _engine_kwargs()
-    assert kw == {"pool_pre_ping": True}
+    assert kw["pool_pre_ping"] is True
+    assert "poolclass" not in kw
+    assert kw["connect_args"] == {}
+
+
+def test_tenant_viaja_no_handshake_da_conexao(monkeypatch):
+    """`options` é parâmetro de inicialização do libpq, não um `SET` avulso — por isso
+    sobrevive ao PgBouncer, onde um SET pode não valer para a transação seguinte."""
+    monkeypatch.setattr(settings, "DATABASE_URL", "postgresql+psycopg://u:p@h:5432/d")
+    monkeypatch.setattr(settings, "DB_SCHEMA", "demo")
+    assert _engine_kwargs()["connect_args"]["options"] == "-csearch_path=demo"
+
+
+def test_tenant_e_pooler_convivem(monkeypatch):
+    """A vitrine roda nos dois modos ao mesmo tempo: schema separado E pooler."""
+    monkeypatch.setattr(settings, "DATABASE_URL", "postgresql+psycopg://u:p@x.pooler.supabase.com:6543/d")
+    monkeypatch.setattr(settings, "DB_SCHEMA", "demo")
+    kw = _engine_kwargs()
+    assert kw["connect_args"]["options"] == "-csearch_path=demo"
+    assert kw["connect_args"]["prepare_threshold"] is None
+    assert kw["poolclass"].__name__ == "NullPool"

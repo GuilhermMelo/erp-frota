@@ -21,8 +21,15 @@ services:
       # Postgres do Supabase. Use a porta 6543 (pooler, PgBouncer transaction mode) —
       # o app já se ajusta a ela sozinho (ver app/db/session.py). Não esqueça o
       # ?sslmode=require: o Supabase recusa conexão em texto claro.
-      # postgresql+psycopg://postgres.<ref>:<senha>@aws-0-<regiao>.pooler.supabase.com:6543/postgres?sslmode=require
+      # O usuário é o PAPEL criado por scripts/criar_tenant.sql, não o `postgres`.
+      # postgresql+psycopg://<papel>:<senha>@aws-0-<regiao>.pooler.supabase.com:6543/postgres?sslmode=require
       - key: DATABASE_URL
+        sync: false
+
+      # O tenant deste serviço. `gm` no projeto Supabase privado (dados reais),
+      # `demo` no projeto de demonstração (dados inventados). São dois serviços do
+      # Render, um por projeto Supabase — nunca os dois no mesmo banco.
+      - key: DB_SCHEMA
         sync: false
 
       # FIXO entre deploys. Se mudar, todo token emitido antes vira inválido e o sistema

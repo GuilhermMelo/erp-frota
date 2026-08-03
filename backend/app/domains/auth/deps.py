@@ -12,6 +12,10 @@ from app.domains.users.models import User, UserRole
 
 _bearer = HTTPBearer(auto_error=False)
 
+# Métodos que não mudam estado. OPTIONS entra porque o navegador o dispara sozinho no
+# preflight de CORS — barrá-lo quebraria a tela antes de qualquer pedido real acontecer.
+_LEITURA = frozenset({"GET", "HEAD", "OPTIONS"})
+
 
 async def get_current_user(
     request: Request,
@@ -30,6 +34,21 @@ async def get_current_user(
     user = db.get(User, user_id)
     if user is None or not user.is_active:
         raise Unauthorized("Usuário inválido ou inativo.")
+
+    # Vitrine é só leitura, e o bloqueio mora AQUI de propósito.
+    #
+    # A alternativa seria checar o papel em cada endpoint de escrita — são 29 deles, e
+    # basta esquecer um para a credencial pública virar escrita pública. É a mesma razão
+    # pela qual a auditoria é um listener e não uma chamada no service: um lugar só,
+    # impossível de esquecer, e um endpoint novo já nasce protegido.
+    #
+    # Isto cobre 100% das escritas porque TODAS dependem desta função (auditado: o único
+    # endpoint de escrita sem usuário é o POST /auth/login, que precisa ser assim).
+    if user.role == UserRole.demonstracao and request.method not in _LEITURA:
+        raise Forbidden(
+            "Esta é a conta de demonstração: dá para navegar por tudo, mas não para "
+            "alterar nada."
+        )
 
     # Deixa o usuário visível para o listener de auditoria, que roda longe daqui.
     set_actor(Actor(user_id=user.id, email=user.email, ip=request.client.host if request.client else None))

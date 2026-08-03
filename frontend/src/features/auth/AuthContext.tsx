@@ -7,7 +7,7 @@ export type User = {
   code: string
   email: string
   full_name: string
-  role: 'admin' | 'operador'
+  role: 'admin' | 'operador' | 'demonstracao'
   is_active: boolean
 }
 

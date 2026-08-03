@@ -30,13 +30,27 @@ def _engine_kwargs() -> dict:
     """
     url = settings.DATABASE_URL
     via_pooler = "pooler.supabase" in url or ":6543" in url
+    schema = settings.DB_SCHEMA.strip()
+
+    connect_args: dict = {}
+    if schema:
+        # Parâmetro de inicialização do libpq: vai junto no handshake da conexão, e não
+        # como um `SET` avulso. Isso importa com PgBouncer em modo transaction, onde um
+        # `SET` sem `LOCAL` pode não sobreviver à troca de conexão física entre
+        # transações — e a consulta seguinte cairia no schema errado.
+        #
+        # Ainda assim, em produção quem GARANTE o isolamento não é isto: é o papel do
+        # Postgres criado por scripts/criar_tenant.sql, que só tem permissão no próprio
+        # schema e carrega o search_path como padrão. Isto aqui é conveniência para
+        # desenvolvimento; a trava é do banco.
+        connect_args["options"] = f"-csearch_path={schema}"
 
     if not via_pooler:
-        return {"pool_pre_ping": True}
+        return {"pool_pre_ping": True, "connect_args": connect_args}
 
     return {
         "poolclass": NullPool,
-        "connect_args": {"prepare_threshold": None},
+        "connect_args": {**connect_args, "prepare_threshold": None},
     }
 
 

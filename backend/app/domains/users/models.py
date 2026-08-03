@@ -10,6 +10,10 @@ from app.db.base_class import Base, TimestampMixin, UUIDPrimaryKey, code_column
 class UserRole(str, Enum):
     admin = "admin"
     operador = "operador"
+    # Login de vitrine, com credencial publicada. NÃO escreve nada: o bloqueio é no
+    # `get_current_user`, que é por onde passa toda requisição autenticada — e a auditoria
+    # deste projeto mostra que todo endpoint de escrita depende dele.
+    demonstracao = "demonstracao"
 
 
 class User(UUIDPrimaryKey, TimestampMixin, Base):

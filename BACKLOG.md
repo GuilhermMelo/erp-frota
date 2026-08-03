@@ -99,12 +99,55 @@ que sobe duas instâncias não dispara dois `alembic upgrade` concorrentes.
 12 testes novos (`test_config_producao.py`) cobrindo cada trava e a detecção do pooler.
 **132 no total, todos passando.**
 
-### Pendente
+### Vitrine pública: somente leitura e tenant separado
 
-O suporte a Supabase e ao deploy está pronto e testado, mas **não há decisão de publicar este
-sistema**: quem foi para a nuvem foi o `gm-locacoes`. Aqui o trabalho vale como o que é — a
-demonstração de como a migração seria feita, com os quatro problemas silenciosos identificados e
-resolvidos antes de existirem.
+Pedido: a demonstração tem login e senha públicos, e ninguém pode alterar nada. Duas camadas
+independentes, porque uma credencial publicada na internet é atacada por quem tem tempo.
+
+**Camada 1 — papel `demonstracao` (migração 0003).** O bloqueio mora dentro do
+`get_current_user`, e isso foi decidido depois de auditar: dos 30 endpoints que escrevem, 29
+dependem dessa função, e o único que não depende é o `POST /auth/login`, que precisa ser assim.
+Checar o papel em cada rota daria o mesmo resultado hoje e falharia no primeiro endpoint novo —
+é a mesma razão pela qual a auditoria é um listener e não uma chamada no service.
+
+O teste **não testa por amostragem**: enumera as rotas registradas no app e exige 403 em cada
+uma que escreve (33 hoje). Rota futura entra sozinha.
+
+**Camada 2 — tenant por schema, e não por coluna.** `tenant_id` em cada tabela com `WHERE` em
+cada consulta é o desenho comum, e foi **descartado**: um filtro esquecido em 13 modelos faz a
+vitrine mostrar a frota real, e esse bug não aparece em teste — aparece quando alguém olha.
+
+Aqui a isolação é do Postgres: cada tenant é um schema, e o papel que conecta não tem permissão
+no `public` (`scripts/criar_tenant.sql`). Consulta sem filtro não vaza porque o banco recusa.
+
+**Topologia final:** dois projetos Supabase — o plano gratuito permite exatamente 2.
+
+| Projeto | `DB_SCHEMA` | Papel | Dados |
+|---|---|---|---|
+| privado | `gm` | `gm_app` | reais |
+| demonstração | `demo` | `gm_demo` | inventados |
+
+Bancos separados já bastariam. O schema e o papel restrito são a segunda camada: se alguém
+apontar a vitrine para o banco errado, a conexão **falha** em vez de vazar.
+
+### O bug que quase passou
+
+O `SET search_path` que adicionei ao `migrations/env.py` abria uma transação implícita antes de
+o Alembic assumir, e a migração inteira era revertida ao fechar a conexão. **O `upgrade`
+terminava com código 0 e as tabelas não existiam.** Está comentado no arquivo para ninguém
+remover o `commit()` achando que é redundante.
+
+### Verificado
+
+**177 testes.** Os novos cobrem: cada rota de escrita recusando a conta de demonstração, a
+leitura funcionando, o admin continuando a escrever, as tabelas nascendo dentro do schema do
+tenant, cada tenant com o próprio `alembic_version`, as sequences de código independentes (senão
+o `CAR000001` do demo consumiria o número do real) e o dado de um não aparecendo no outro.
+
+O que os testes **não** provam, e precisa ser conferido à mão uma vez: a permissão do papel.
+A suíte roda como dono do banco e enxerga tudo. A conferência está escrita no fim do
+`criar_tenant.sql` — conectar como o papel e exigir `permission denied` em
+`SELECT count(*) FROM public.vehicles`. **Não publicar a credencial antes de ver o erro.**
 
 ### Ainda não resolvido
 

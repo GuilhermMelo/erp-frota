@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import {
   Car,
   ClipboardCheck,
+  Eye,
   FileText,
   LayoutDashboard,
   LogOut,
@@ -137,6 +138,17 @@ export function Layout() {
       {/* pt-14 abre espaço para a barra superior do celular; md:pt-8 a dispensa.
           Padding menor no telefone: 32 px de margem custam 16% da largura útil. */}
       <main id="conteudo" className="min-w-0 flex-1 overflow-x-hidden p-4 pt-18 md:p-8">
+        {/* Sem este aviso, o visitante clica em "Novo veículo", toma 403 e conclui que o
+            sistema está quebrado. Dizer antes transforma limite em informação. */}
+        {user?.role === 'demonstracao' && (
+          <div className="mb-6 flex items-start gap-2 rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">
+            <Eye size={16} className="mt-0.5 shrink-0" />
+            <span>
+              <strong>Modo demonstração.</strong> Os dados são fictícios e a navegação é livre —
+              mas nada pode ser criado, alterado ou excluído.
+            </span>
+          </div>
+        )}
         <Outlet />
       </main>
     </div>

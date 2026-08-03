@@ -63,22 +63,23 @@ if ok(c.get("/vehicles"), "conferir banco vazio"):
 print("login ok, banco vazio confirmado")
 
 # ------------------------------------------------------------------ usuário de demonstração
-# Um login "Demo" para mostrar o sistema sem usar a conta do dono. É `operador`:
-# 19 endpoints exigem admin (vender veículo, excluir lançamento, listar usuários),
-# então quem estiver demonstrando não apaga nada por engano.
+# Papel `demonstracao`: SOMENTE LEITURA. A credencial é publicada de propósito, então
+# `operador` não serviria — ele escreve. O bloqueio é no `get_current_user`, por onde
+# passa toda requisição autenticada, e um teste enumera as rotas para garantir que
+# nenhuma escrita escapa (tests/test_demonstracao.py).
 ok(
     c.post(
         "/users",
         json={
             "email": "demo@erpfrota.com.br",
             "full_name": "Usuário Demonstração",
-            "role": "operador",
+            "role": "demonstracao",
             "password": "demo1234",
         },
     ),
     "usuário demo",
 )
-print("usuário demo@erpfrota.com.br criado (operador)")
+print("usuário demo@erpfrota.com.br criado (somente leitura)")
 
 # ---------------------------------------------------------------- motoristas
 MOTORISTAS = [

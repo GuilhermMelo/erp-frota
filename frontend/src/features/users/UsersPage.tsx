@@ -37,7 +37,7 @@ import {
 import { formatDateTime } from '../../lib/format'
 import { useAuth } from '../auth/AuthContext'
 
-type UserRole = 'admin' | 'operador'
+type UserRole = 'admin' | 'operador' | 'demonstracao'
 
 type SystemUser = {
   id: string
@@ -60,6 +60,12 @@ const ROLES: Record<UserRole, { label: string; className: string; ajuda: string 
     className: 'bg-slate-100 text-slate-700',
     ajuda: 'Toca a operação do dia a dia. Não vende veículo, não exclui lançamento e não mexe em usuários.',
   },
+  demonstracao: {
+    label: 'Demonstração',
+    className: 'bg-sky-100 text-sky-800',
+    ajuda:
+      'Somente leitura: navega por tudo e não altera nada. É o papel para vitrine, com credencial que pode ser publicada.',
+  },
 }
 
 /* ---------------------------------------------------------------- formulário */
@@ -70,7 +76,7 @@ const ROLES: Record<UserRole, { label: string; className: string; ajuda: string 
 const userSchema = z.object({
   full_name: z.string().trim().min(2, 'Informe o nome completo.').max(120),
   email: z.string().trim().email('E-mail inválido.'),
-  role: z.enum(['admin', 'operador']),
+  role: z.enum(['admin', 'operador', 'demonstracao']),
   is_active: z.enum(['sim', 'nao']),
   password: z
     .string()
