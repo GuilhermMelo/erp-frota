@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 
 import {
   Car,
@@ -6,6 +6,7 @@ import {
   FileText,
   LayoutDashboard,
   LogOut,
+  Menu,
   Receipt,
   ShieldAlert,
   TrendingDown,
@@ -15,7 +16,7 @@ import {
   Wrench,
   type LucideIcon,
 } from 'lucide-react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 
 import { api } from '../api/client'
 import { useAuth } from '../features/auth/AuthContext'
@@ -44,6 +45,14 @@ const NAV_ADMIN: ItemNav[] = [{ to: '/usuarios', label: 'Usuários', icon: UserC
 
 export function Layout() {
   const { user, logout } = useAuth()
+  const { pathname } = useLocation()
+
+  // O menu no celular é uma gaveta. Numa tela de 390 px, uma barra fixa de 240 px
+  // deixaria ~150 px de conteúdo — a tabela de veículos ficaria ilegível.
+  const [menuAberto, setMenuAberto] = useState(false)
+
+  // Navegar fecha a gaveta. Sem isto, o menu fica por cima da tela que acabou de abrir.
+  useEffect(() => setMenuAberto(false), [pathname])
 
   useEffect(() => {
     // Gera as cobranças semanais dos contratos ativos ao abrir o app.
@@ -55,7 +64,35 @@ export function Layout() {
 
   return (
     <div className="flex min-h-screen">
-      <aside className="flex w-60 shrink-0 flex-col border-r border-slate-200 bg-white">
+      {/* Barra superior só no celular: abre a gaveta e mostra onde você está. */}
+      <header className="fixed inset-x-0 top-0 z-30 flex h-14 items-center gap-3 border-b border-slate-200 bg-white px-4 md:hidden">
+        <button
+          onClick={() => setMenuAberto(true)}
+          aria-label="Abrir menu"
+          className="rounded-lg p-2 text-slate-600 hover:bg-slate-100"
+        >
+          <Menu size={20} />
+        </button>
+        <span className="font-semibold text-slate-900">GM Locações</span>
+      </header>
+
+      {/* Fundo escuro: no celular, tocar fora fecha a gaveta. */}
+      {menuAberto && (
+        <div
+          onClick={() => setMenuAberto(false)}
+          className="fixed inset-0 z-30 bg-slate-900/40 md:hidden"
+          aria-hidden
+        />
+      )}
+
+      <aside
+        className={cn(
+          'flex w-60 shrink-0 flex-col border-r border-slate-200 bg-white',
+          // No celular vira gaveta deslizante; do md para cima, a barra fixa de sempre.
+          'fixed inset-y-0 left-0 z-40 transition-transform md:static md:translate-x-0',
+          menuAberto ? 'translate-x-0' : '-translate-x-full',
+        )}
+      >
         <div className="border-b border-slate-200 px-5 py-4">
           <div className="text-lg font-semibold text-slate-900">GM Locações</div>
           <div className="text-xs text-slate-500">Gestão de frota</div>
@@ -97,7 +134,9 @@ export function Layout() {
         </div>
       </aside>
 
-      <main id="conteudo" className="flex-1 overflow-x-hidden p-8">
+      {/* pt-14 abre espaço para a barra superior do celular; md:pt-8 a dispensa.
+          Padding menor no telefone: 32 px de margem custam 16% da largura útil. */}
+      <main id="conteudo" className="min-w-0 flex-1 overflow-x-hidden p-4 pt-18 md:p-8">
         <Outlet />
       </main>
     </div>
