@@ -1,193 +1,170 @@
-# Backlog — ERP Frota v1
+# Backlog — GM Locações
 
-> Diário do projeto. Uma entrada por sessão. Mais recente no topo.
+> Diário do projeto. Uma entrada por sessão, mais recente no topo. **Histórico antigo condensa:**
+> o detalhe de como um bug foi corrigido vive no `git log`, não aqui. Este arquivo guarda decisão
+> e pendência — o que o próximo leitor precisa para não repetir trabalho.
 
 ## Próximo
 
-1. **GERAR O INSTALADOR — 1 passo, bloqueado por uma permissão do Windows.**
-   Ligue o **Modo de desenvolvedor** (Configurações → Privacidade e segurança → Para desenvolvedores),
-   depois: `cd desktop && npm run dist`. Sai o `desktop/dist/GM Locações Setup 1.0.0.exe`.
-   *Por que trava sem isso:* o `electron-builder` extrai um pacote de assinatura de código que contém
-   symlinks do macOS, e criar symlink no Windows exige privilégio. Não é problema do código — o app
-   em si já roda (verificado).
-2. **Cadastrar os veículos reais e migrar a planilha.** É aqui que o sistema passa a valer algo.
-3. Trocar a senha do admin (`admin123`). Em produção o `SECRET_KEY` já é sorteado por instalação.
-4. Depois: relatórios PDF/Excel, alertas automáticos, busca global, plano de manutenção preventiva.
+1. **Trocar a senha do admin nas instalações que já existem.** O mecanismo novo (senha sorteada)
+   só age onde ainda não há usuário. Onde o admin já foi criado com `admin123`, a troca é manual —
+   ou apague o usuário e deixe o seed recriá-lo no próximo boot.
+2. **Gerar o instalador** — bloqueado por uma permissão do Windows. Ligue o **Modo de
+   desenvolvedor** (Configurações → Privacidade e segurança → Para desenvolvedores), depois
+   `cd desktop && npm run dist`. O `electron-builder` extrai um pacote com symlinks do macOS, e
+   criar symlink no Windows exige privilégio. Não é problema do código: o app já roda.
+4. **Cadastrar os veículos reais e migrar a planilha.** É aqui que o sistema passa a valer algo.
+5. Depois: relatórios PDF/Excel, alertas automáticos, busca global, manutenção preventiva.
 
-### Dívidas conhecidas (nenhuma bloqueia o uso)
+## Dívidas conhecidas
 
-- **O app instalado ainda depende do Docker Desktop** para o Postgres. Na sua máquina ele já inicia
-  com o Windows, então é invisível. Numa máquina limpa (PC de funcionário), ou o Postgres entra no
-  instalador, ou o banco vira hospedado. **Não decidido.**
-- **O `.exe` não será assinado** (~US$ 200/ano). O Windows mostra "protegeu o seu PC" na primeira
-  execução → "Mais informações" → "Executar assim mesmo". Uma vez só, por máquina.
-- **Não existe `DELETE /inspections`.** Vistoria criada por engano não some. (Fotos e itens dão para apagar.)
-- **Não dá para corrigir um preço de venda digitado errado.** Vender de novo dá 409. Falta um
+Nenhuma bloqueia o uso.
+
+**Resíduo do modelo antigo, anterior ao Postgres embutido (Sessão 4):**
+- `scripts/iniciar-erp.ps1` ainda sobe o banco pelo Docker e roda o `.exe` do backend direto — é o
+  lançador pré-Electron. `GM Locações.cmd` na raiz aponta para ele. Ou reescrever para o Postgres
+  portátil, ou remover os dois: hoje o repositório mostra dois caminhos de execução e um está morto.
+- `docker-compose.yml` sobrou do modelo antigo. Decidir: manter como alternativa de dev, ou remover.
+- `README.md` já foi corrigido (Sessão 4).
+
+**Produto:**
+- Não existe `DELETE /inspections`. Vistoria criada por engano não some (fotos e itens, sim).
+- Não dá para corrigir preço de venda digitado errado. Vender de novo dá 409. Falta
   `POST /vehicles/{id}/sell/undo`.
 - `RevenueOut` não traz veículo/motorista aninhados (a tela faz o join no cliente).
 
+**Empacotamento:**
+- O `.exe` não será assinado (~US$ 200/ano). O Windows mostra "protegeu o seu PC" na primeira
+  execução → "Mais informações" → "Executar assim mesmo". Uma vez por máquina.
+
 ---
 
-## Sessão 3 — 2026-07-11
+## Sessão 4 — 2026-08-03
 
-App de desktop (Electron). O sistema deixou de exigir três comandos no terminal.
+Projeto clonado numa máquina nova. Ambiente montado do zero e auditoria de segurança do
+repositório público.
 
-### Decisão: Electron agora se paga
+### Decisão: nenhuma senha no código-fonte
 
-Na sessão 1 eu argumentei CONTRA o Electron — ele cobra assinatura de código e auto-update sem dar
-nada em troca. Aquilo valia para um sistema com API hospedada. **Como tudo aqui roda local, o
-Electron passou a se pagar**: ele empacota Postgres + API + interface num clique só. Decisão revista.
+O repositório é **público**. `admin123` estava em `.env.example`, `config.py`, `seed.py`, nos
+testes e no README — ou seja, a senha inicial de toda instalação que existisse era pública.
 
-### Como ficou
+`ADMIN_PASSWORD` agora nasce **vazio**, e vazio significa **sortear**: o seed gera
+`secrets.token_urlsafe(18)` no primeiro boot e grava em
+`%LOCALAPPDATA%\GM Locacoes\senha-inicial-admin.txt`, arquivo que pede para ser apagado após o
+primeiro login. Preencher `ADMIN_PASSWORD` continua valendo — é assim que a suíte de testes sabe
+a senha de antemão.
 
-- **A API serve a interface compilada.** Deu certo por sorte de projeto: as rotas da interface são em
-  português (`/veiculos`, `/cobrancas`) e as da API em inglês (`/vehicles`, `/revenues`) — **não
-  colidem**. Uma porta só, sem CORS, sem servidor web separado. O catch-all fica por último e devolve
-  o `index.html` (senão dar F5 em `/veiculos/123` daria 404).
-- **Backend empacotado com PyInstaller** (62 MB): quem instalar **não precisa ter Python**.
-- **As migrações rodam sozinhas no boot.** Ninguém vai abrir um terminal para rodar `alembic` num
-  programa de desktop.
-- **O Electron garante o Postgres**: tenta `docker start erp-frota-db`; se o container não existir,
-  sobe pelo compose com o nome de projeto FIXO (`-p erp-frota-v1`) — se o Docker derivasse o nome da
-  pasta, uma pasta diferente criaria um volume novo e **o banco apareceria vazio**, com os dados
-  "sumidos" no volume antigo.
-- Ao fechar a janela, o backend morre junto (`taskkill /T`, para não deixar órfão segurando a 8010).
+Por que arquivo, e não log: o app é de desktop e roda sem console. Senha em `logger.info` morre
+num arquivo que ninguém abre. **Escrever a senha em texto puro não é bom** — é melhor que a
+alternativa que existia, que era uma senha fixa num repositório aberto.
 
-### Bugs consertados
+A entrega da senha acontece **depois do commit**: entregar credencial de um usuário que não foi
+gravado mandaria o dono tentar um login que nunca funcionaria.
 
-- **`AttributeError: 'NoneType' has no attribute 'isatty'`** no boot do `.exe`. Com `console=False`, o
-  Windows não dá handles de saída: `sys.stdout` fica `None` e o uvicorn chama `.isatty()` nele.
-  O `run_server.py` agora aponta as saídas para `%LOCALAPPDATA%\GM Locacoes\logs\backend.log` antes de
-  subir o uvicorn. **Num `.exe` sem console, log em arquivo não é conforto — é a única pista** quando
-  o app não abre na máquina de quem instalou.
-- **`ModuleNotFoundError: No module named 'app.db.base'`** — só apareceu depois que o log existiu.
-  O Alembic lê `migrations/env.py` do disco em tempo de execução, então o `from app.db.base import
-  Base` de lá é invisível para o PyInstaller: o `.exe` ia com zero models. Corrigido com
-  `collect_submodules("app")` no `.spec`.
-- **Program Files não é gravável.** As fotos e a chave secreta iriam para o lado do `.exe` e o primeiro
-  upload daria "Acesso negado". Agora vão para `%LOCALAPPDATA%\GM Locacoes\`.
-- **Segredo do JWT sorteado por instalação** (`secret.key`). Sem isso, todas as instalações
-  compartilhariam o segredo que está no código-fonte e qualquer um forjaria um token de admin.
-- **Path traversal no catch-all da SPA**: `/../../.env` leria fora da pasta. Fechado.
+### Auditoria do repositório público
 
-### Armadilha de ambiente (não é bug do app)
+Varridos os 3 commits inteiros (`git log --all -p`), não só a árvore atual:
 
-Rodar `npm start` **de dentro do VS Code** falha com `Cannot read properties of undefined (reading
-'requestSingleInstanceLock')`. O VS Code define `ELECTRON_RUN_AS_NODE=1` no terminal; com ela, o
-Electron roda como Node puro e `require('electron')` devolve um caminho em vez da API. Rode de um
-terminal normal, ou `Remove-Item Env:\ELECTRON_RUN_AS_NODE` antes.
+- Nunca commitado: `.env` real, `secret.key`, chave privada, `.pem`, `.pfx`.
+- Zero ocorrências de token real (`ghp_`, `sk-`, `AKIA`, `AIza`, `xox*`).
+- `storage/` sempre ignorado — nenhuma foto de CNH/CPF ou contrato no histórico.
+- Exposto: só credenciais padrão de desenvolvimento (`admin123`, `dev-secret-troque-em-producao`,
+  `frota:frota`). As duas últimas já eram inofensivas — o `.exe` sorteia seu `SECRET_KEY` e o
+  banco só escuta em `localhost`.
+- Repositório com 0 forks, 0 stars, 0 watchers.
+
+**Conclusão: nada sensível vazou.** O risco era a senha inicial padrão, agora eliminada.
+
+### Ambiente de desenvolvimento em máquina nova
+
+- **Python 3.13 é obrigatório.** No 3.14 o `pip install` falha: `pydantic-core==2.33.2` não tem
+  wheel `cp314`, cai em compilação Rust e o PyO3 0.24.1 recusa Python acima do 3.13.
+- **Postgres 16.10 portátil** baixado para `desktop/vendor/pgsql` (~300 MB, fora do git). Cluster
+  em `%LOCALAPPDATA%\GM Locacoes\pgdata` — o mesmo caminho do app, então dev e app instalado
+  compartilham o banco.
+- **`pg_ctl start` trava se a saída for canalizada no PowerShell.** O servidor herda o handle de
+  stdout e o pipeline nunca fecha; o banco sobe, mas o comando fica pendurado. Redirecione para
+  arquivo, não use `|`.
+- A pasta do clone é `erp`, não `erp-frota-v1`. **Deixou de importar:** o nome só afetava o volume
+  do Docker, e o caminho dos dados hoje é fixo em `%LOCALAPPDATA%`.
+
+### CLAUDE.md reescrito
+
+Encurtado (entra no contexto toda sessão) e ganhou duas seções: **Segurança** (7 regras para
+repositório aberto) e **Economia de contexto** (não ler arquivo inteiro, não rodar a suíte toda
+para validar um domínio, não ler `vendor/`/`node_modules`/`package-lock.json`).
 
 ### Verificado
 
-`.exe` do backend rodando sozinho: `/health` → `{"status":"ok","db":"up"}`, `/` serve a interface
-(título "GM Locações"), `/veiculos` devolve 200 (rota do React), migrações aplicadas no boot.
-Electron aberto: 4 processos, backend subido em segundo plano, banco respondendo.
+113 testes passando depois da mudança do seed. API `/health` → `{"status":"ok","db":"up"}`,
+login retornando JWT, Vite em `localhost:5273` respondendo 200, migrações em `0002 (head)`,
+17 tabelas.
 
-### Pendente
+### Decisão: o repositório continua público, e serve de portfólio
 
-O instalador (ver "Próximo", item 1).
+Levantada a opção de fechar o repositório e **recusada pelo dono**: o projeto é peça de portfólio.
+Duas consequências, que não são opcionais a partir daqui:
+
+1. A regra "nenhum segredo no código-fonte" deixa de ser higiene e passa a ser a única defesa que
+   existe. Por isso é a regra 1 da seção de Segurança do `CLAUDE.md`, escrita como regra.
+2. **Documentação errada custa mais do que documentação ausente.** Quem lê um repositório de
+   portfólio julga pelo README. O README pedia Docker Desktop como pré-requisito — falso desde o
+   commit `2f73735`, que trocou o Docker pelo Postgres embutido.
+
+### README reescrito para leitura externa
+
+Antes ele era manual de operação de quem já conhecia o sistema. Agora abre pelo problema (a conta
+que a locadora quase nunca faz direito), depois a equação, as três armadilhas de contagem dupla, e
+só então instalação. As decisões técnicas passaram a explicar **por que**, não só o quê — é o que
+distingue um repositório de portfólio de um dump de código.
+
+Corrigido: Docker deixou de ser pré-requisito, entrou o passo do Postgres portátil, entraram os
+dois tropeços de ambiente desta sessão (Python 3.13 e não 3.14; `pg_ctl` com pipe no PowerShell) e
+a tabela de onde ficam os dados. Adicionados badges de stack e a seção Segurança e LGPD.
+
+### Aplicado na instalação local
+
+Admin `USR000001` apagado; o seed recriou como `USR000002` com senha sorteada de 24 caracteres.
+Verificado: a senha do arquivo entra, `admin123` recebe 401. Os 3 registros de auditoria
+sobreviveram à exclusão do usuário — que é exatamente o que o `actor_email` desnormalizado, sem
+FK para `users`, foi feito para garantir.
+
+### graphify instalado
+
+`graphifyy` (PyPI, projeto `Graphify-Labs/graphify`) via `uv tool install`. Atenção ao escolher:
+existe um `@sentropic/graphify` no npm, de outra organização (`rhanka/graphify`), com nome quase
+idêntico — o README oficial avisa que os outros pacotes `graphify*` não são afiliados.
+
+A skill mora em `~/.claude/skills/graphify/` (perfil do usuário, não do projeto). Custo em
+contexto por sessão: 3 linhas no `~/.claude/CLAUDE.md`; os 39 KB do `SKILL.md` só carregam quando
+`/graphify` é chamado. `graphify-out/` está no `.gitignore` — é derivado do código, regerável com
+`graphify update .`.
 
 ---
 
-## Sessão 2 — 2026-07-11
+## Sessões 1 a 3 — 2026-07-11 (condensado)
 
-Empacotamento do backend em `.exe` (PyInstaller). O `.exe` já subia — só morria num diálogo do
-Windows antes de servir a primeira requisição. Dois bugs, um escondido atrás do outro.
+Projeto criado do zero e entregue funcionando ponta a ponta, depois empacotado como app de desktop.
 
-### Consertado
+### Decisões que ainda valem
 
-- **`AttributeError: 'NoneType' object has no attribute 'isatty'`** no boot do `.exe`.
-  Com `console=False`, o Windows não dá handles de saída ao processo: `sys.stdout` e `sys.stderr`
-  ficam `None`, e o uvicorn chama `sys.stdout.isatty()` ao montar o formatador de log.
-  `run_server.py` agora aponta as duas saídas para `%LOCALAPPDATA%\ERP Frota\logs\backend.log`
-  antes de chamar o uvicorn, e loga o traceback de qualquer exceção antes de morrer.
-- **`ModuleNotFoundError: No module named 'app.db.base'`** — só apareceu depois que o log passou a
-  existir. O Alembic lê `migrations/env.py` do disco em tempo de execução, então o
-  `from app.db.base import Base` de lá é invisível para o PyInstaller: o `.exe` ia com zero models.
-  O `.spec` agora usa `collect_submodules("app")` no lugar de `"app.main"`.
+- **FastAPI, não NestJS** (o manifesto original propunha NestJS + Prisma): Python é a força do dono,
+  e o sistema é mantido por uma pessoa só.
+- **Electron se paga aqui.** Na Sessão 1 o argumento foi contra — ele cobra assinatura de código e
+  auto-update sem dar nada em troca. Isso valia para um sistema com API hospedada. Como tudo roda
+  local, o Electron empacota banco + API + interface num clique. Decisão revista na Sessão 3.
+- **A API serve a interface compilada.** As rotas da UI são em português e as da API em inglês:
+  não colidem. Uma porta só, sem CORS, sem servidor web separado.
+- **As migrações rodam sozinhas no boot.** Ninguém abre terminal para rodar `alembic` num programa
+  de desktop.
+- **`.exe` sem console PRECISA de log em arquivo.** Não é conforto: é a única pista quando o app
+  não abre na máquina de quem instalou.
+- **Segredo do JWT sorteado por instalação.** Sem isso, toda instalação compartilharia o segredo do
+  código-fonte e qualquer um forjaria um token de admin.
 
-### Decisão
+### Bugs que custaram caro (detalhe no `git log`)
 
-- **O `.exe` sem console PRECISA de log em arquivo, não é conforto.** Sem terminal, todo erro de boot
-  vira uma caixa de diálogo sem contexto na máquina de quem instalou. O log é a única pista.
-
-### Verificado
-
-`.exe` reempacotado e executado: `/health` → `{"status":"ok","db":"up"}`, `/` serve a interface (200),
-migrações rodam sozinhas no boot.
-
-### Pendências
-
-- O instalador (NSIS/Inno) e o atalho no menu Iniciar ainda não existem — hoje é a pasta
-  `dist/erp-frota-api/` inteira.
-- O `.exe` continua exigindo o Postgres no Docker de pé. Para entregar numa máquina limpa, ou o
-  Postgres entra no instalador, ou o banco vira SQLite/hospedado. **Não decidido.**
-
----
-
-## Sessão 1 — 2026-07-11
-
-Projeto criado do zero e entregue funcionando ponta a ponta.
-
-### Contexto
-
-Partiu de um manifesto (`ERP_Frota_Manifesto_v1.md`) escrito com ajuda do ChatGPT, que propunha
-NestJS + Prisma + Electron. Revisto antes de escrever a primeira linha.
-
-### Decisões
-
-- **Backend em FastAPI**, não NestJS: Python é a força do dono. Sistema real, mantido sozinho por
-  anos — velocidade e confiança valem mais que pureza arquitetural.
-- **Web + PWA**, não Electron: exige internet de qualquer forma, e o Electron cobra assinatura de
-  código e auto-update sem dar nada em troca agora. É o mesmo React dentro de uma casca, depois.
-- **Portas não-padrão** (5434 / 8010 / 5273): as padrão já estavam ocupadas nesta máquina
-  (Postgres local, `ai-doc-postgres`, e o Atlas Sports na 8000 e na 5173). O Vite roda com
-  `strictPort` — falha em vez de subir na porta errada em silêncio.
-- **As três armadilhas de contagem dupla** fechadas por construção: valor de compra, valor de venda
-  e **caução** moram em um lugar só. A caução não é receita — é dinheiro que se segura e devolve.
-- **Multa registra sempre a despesa**; o reembolso do motorista entra como receita ligada à multa.
-  Líquido dá zero sozinho e o rastro fica preservado.
-- **Cobrança semanal idempotente** por constraint `UNIQUE(contract_id, period_start)` — roda a cada
-  abertura do app, sem cron. **Inadimplência é derivada**, não armazenada.
-- **Fotos comprimidas no navegador** (1600px / JPEG 0.8). Medido: 200 fotos de 5 MB → ~20 MB.
-- Manutenção: **histórico simples**. Sem plano preventivo, sem lembrete — foi pedido assim.
-
-### Bugs reais encontrados e corrigidos durante a construção
-
-1. **Vender um carro com contrato ativo corrompia o lucro dele.** O contrato seguia ativo e a
-   geração semanal continuava criando aluguel para um carro que não é mais do dono: a conta fechada
-   em R$ 0,00 voltava a +R$ 800 na semana seguinte. E a caução do motorista ficava presa. Agora a
-   venda é recusada com 409 e uma mensagem que diz o que fazer.
-2. **Apagar multa/manutenção sumia com a despesa sem deixar rastro na auditoria.** O `ON DELETE
-   CASCADE` do Postgres apagava a despesa por baixo do ORM, e o listener de auditoria é cego a
-   cascata de banco. O custo do carro caía e ninguém sabia quem apagou. Agora a despesa é apagada
-   pelo ORM antes do pai.
-3. **A auditoria gravava `actor_email='sistema'` mesmo com usuário logado.** `get_current_user` era
-   uma dependência síncrona: o FastAPI a roda numa thread do pool, que recebe uma *cópia* do
-   contexto — o `set_actor()` escrevia numa cópia descartável. Virou `async def`.
-4. **Todo log de criação gravava `entity_id`/`entity_code` nulos.** O listener rodava em
-   `before_flush`, antes de o banco gerar o UUID e o `code`. Agora coleta o diff em `before_flush`
-   (único momento em que o "de → para" existe) e grava em `after_flush` (único em que o id existe).
-5. **RENAVAM/chassi vazios davam HTTP 500 no segundo veículo.** String vazia gravava `""`, que viola
-   o índice UNIQUE (no Postgres, NULLs são distintos entre si; strings vazias não). Normalizado
-   `"" → NULL`.
-6. **Anexos ficavam órfãos** ao apagar manutenção/multa (`documents` usa ponteiro polimórfico, sem
-   FK — nada cascateia). Arquivo ficava no disco e a linha no banco, sem dono.
-7. **Payback mentia para carro vendido.** Calculado só sobre a operação, dizia "faltam ~8 meses" de
-   um carro que não é mais seu. Agora devolve vazio e a tela diz "não se pagou rodando — o resultado
-   veio da venda".
-
-### Feito
-
-- 16 tabelas, migração Alembic única, seed idempotente (14 categorias de despesa, 32 itens de checklist).
-- Backend: 12 domínios, 43 endpoints. Auditoria automática. Storage local atrás de interface.
-- Frontend: 13 telas. Upload com compressão, fila de 4 paralelos, barra de progresso e retry.
-- **113 testes passando**, incluindo o teste do ciclo de vida (compra R$ 50.000 → 10 aluguéis de
-  R$ 800 → R$ 3.000 de despesas → venda por R$ 45.000 → **lucro R$ 0,00 exato**), a caução que não
-  infla o lucro, a multa reembolsada que zera, `Decimal` sem perda de centavo, e divisão por zero
-  devolvendo vazio em vez de 500.
-- Verificado no Chrome: login, painel, veículos, a conta do veículo e cobranças — **zero erros de console**.
-
-### Pendente
-
-Ver "Próximo".
+`sys.stdout is None` com `console=False` · `ModuleNotFoundError: app.db.base` no PyInstaller ·
+Program Files não é gravável · path traversal no catch-all da SPA. Todos viraram armadilha
+documentada no `CLAUDE.md`.
