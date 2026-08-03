@@ -38,3 +38,6 @@ desktop/vendor/
 
 # Configuração local do editor
 .vscode/
+
+# Grafo de conhecimento do graphify (derivado do código; regerável com `graphify update .`)
+graphify-out/
