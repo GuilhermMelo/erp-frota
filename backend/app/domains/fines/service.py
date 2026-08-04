@@ -36,9 +36,6 @@ ZERO = Decimal("0.00")
 CATEGORY_CODE = "multas"
 
 
-# ---------------------------------------------------------------- leitura
-
-
 def get_fine(db: Session, fine_id: UUID) -> Fine:
     fine = db.get(Fine, fine_id)
     if fine is None:
@@ -97,9 +94,6 @@ def list_out(db: Session, fines: list[Fine]) -> list[FineOut]:
 
 def one_out(db: Session, fine: Fine) -> FineOut:
     return to_out(fine, reimbursed_total(db, fine.id))
-
-
-# ---------------------------------------------------------------- escrita
 
 
 def create_fine(db: Session, data: FineCreate) -> Fine:
@@ -251,9 +245,6 @@ def delete_fine(db: Session, fine: Fine) -> None:
     db.delete(fine)
     db.commit()
     files_service.purge_files(keys)
-
-
-# ---------------------------------------------------------------- interno
 
 
 def _get_vehicle(db: Session, vehicle_id: UUID) -> Vehicle:

@@ -43,9 +43,6 @@ ZERO = Decimal("0.00")
 MAX_WEEKS = 520  # 10 anos
 
 
-# ---------------------------------------------------------------- leitura
-
-
 def get_contract(db: Session, contract_id: UUID) -> Contract:
     contract = db.get(Contract, contract_id)
     if contract is None:
@@ -78,9 +75,6 @@ def active_contract_for_vehicle(db: Session, vehicle_id: UUID) -> Contract | Non
             Contract.status == ContractStatus.active,
         )
     )
-
-
-# ---------------------------------------------------------------- escrita
 
 
 def create_contract(db: Session, data: ContractCreate) -> Contract:
@@ -308,9 +302,6 @@ def generate_all_charges(db: Session) -> list[Revenue]:
 
     db.commit()
     return geradas
-
-
-# ---------------------------------------------------------------- interno
 
 
 def _has_charges(db: Session, contract_id: UUID) -> bool:

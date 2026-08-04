@@ -98,9 +98,6 @@ def delete_maintenance(db: Session, maintenance: Maintenance) -> None:
     files_service.purge_files(keys)
 
 
-# ---------------------------------------------------------------- interno
-
-
 def _get_vehicle(db: Session, vehicle_id: UUID) -> Vehicle:
     vehicle = db.get(Vehicle, vehicle_id)
     if vehicle is None or vehicle.deleted_at is not None:
