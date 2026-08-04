@@ -120,5 +120,35 @@ Write-Host ""
 # chegar. O banco NAO acompanha -- continua preso em localhost.
 Push-Location (Join-Path $RAIZ "backend")
 $env:CORS_ORIGINS = (($ips | ForEach-Object { "http://${_}:$Porta" }) + "http://localhost:$Porta") -join ","
+
+# ---------------------------------------------------------------------------
+# O SEGREDO DE ASSINATURA DO JWT. NAO REMOVA ESTE BLOCO.
+#
+# O padrao do config.py (`dev-secret-troque-em-producao`) esta escrito no
+# codigo-fonte, e este repositorio e PUBLICO. As duas defesas que existem nao
+# alcancam este script: o sorteio por instalacao so acontece com o app
+# empacotado (paths.IS_FROZEN), e o boot so recusa o segredo padrao fora de
+# ENV=dev. Rodando do fonte, com ENV=dev, as duas ficavam desarmadas -- e este
+# e justamente o unico script que abre a porta para a REDE.
+#
+# O estrago nao era "senha em texto claro no Wi-Fi": era pior. Sem precisar de
+# senha nenhuma, qualquer aparelho da rede assinava um token de admin com um
+# segredo que qualquer um le no GitHub, e baixava CNH, CPF e contrato assinado
+# pelo GET /files/{id}/download.
+#
+# Aqui usamos o segredo sorteado UMA vez por instalacao e guardado em
+# %LOCALAPPDATA%\GM Locacoes\secret.key -- o mesmo do app instalado. E ENV=lan
+# faz o proprio config.py exigir isso: se estas linhas sumirem, o servidor
+# RECUSA subir em vez de subir inseguro.
+$env:ENV = "lan"
+$env:SECRET_KEY = (& $PYTHON -c "from app.core import paths; print(paths.installation_secret())")
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($env:SECRET_KEY)) {
+    Write-Host "ERRO: nao consegui ler a chave de assinatura desta instalacao." -ForegroundColor Red
+    Write-Host "Sem ela, qualquer aparelho da rede forjaria um login de administrador." -ForegroundColor Red
+    Pop-Location
+    exit 1
+}
+# ---------------------------------------------------------------------------
+
 & $PYTHON -m uvicorn app.main:app --host 0.0.0.0 --port $Porta
 Pop-Location

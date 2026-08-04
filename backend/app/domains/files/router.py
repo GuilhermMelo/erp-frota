@@ -51,6 +51,25 @@ def _get_document(db: Session, document_id: UUID) -> Document:
     return document
 
 
+def _require_live_owner(db: Session, document: Document) -> None:
+    """O anexo só é LEGÍVEL enquanto o dono dele existe.
+
+    Excluir um motorista é soft delete, e `documents` é ponteiro polimórfico sem FK: nada
+    cascateia. Sem esta checagem, a CNH, o RG e o contrato assinado de uma pessoa cujo
+    cadastro foi excluído continuavam baixáveis pelo id do documento — a tela dizia que o
+    anexo tinha sumido junto (a listagem some) e o endpoint continuava servindo o PDF.
+    Direito de eliminação (LGPD) não pode depender de ninguém adivinhar o id.
+
+    Vale para LEITURA (listar, baixar), nunca para o DELETE: apagar o anexo de um cadastro
+    já excluído é justamente o que se quer poder fazer.
+    """
+    try:
+        entity_type = EntityType(document.entity_type)
+    except ValueError:  # tipo desconhecido no banco: não há como provar que o dono existe
+        raise NotFound("Documento não encontrado.") from None
+    _entity_code(db, entity_type, document.entity_id)
+
+
 @router.post("/upload", response_model=DocumentOut, status_code=status.HTTP_201_CREATED)
 def upload_document(
     db: Db,
@@ -81,6 +100,7 @@ def upload_document(
 
 @router.get("", response_model=list[DocumentOut])
 def list_documents(db: Db, _: CurrentUser, entity_type: EntityType, entity_id: UUID):
+    _entity_code(db, entity_type, entity_id)  # dono excluído: a listagem não existe mais
     return db.scalars(
         select(Document)
         .where(Document.entity_type == entity_type.value, Document.entity_id == entity_id)
@@ -92,6 +112,7 @@ def list_documents(db: Db, _: CurrentUser, entity_type: EntityType, entity_id: U
 def download_document(db: Db, _: CurrentUser, document_id: UUID) -> Response:
     """AUTENTICADO, sempre. Aqui dentro tem CNH, CPF e contrato assinado."""
     document = _get_document(db, document_id)
+    _require_live_owner(db, document)
     return service.download(document.storage_key, document.mime_type, document.original_filename)
 
 

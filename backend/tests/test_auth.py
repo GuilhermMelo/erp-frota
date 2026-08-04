@@ -199,6 +199,96 @@ def test_operador_nao_acessa_endpoint_de_admin(operador, criar_veiculo):
         assert r.json()["error"]["code"] == "sem_permissao"
 
 
+# ---------------------------------------------------------------------------
+# Tem que sobrar um administrador. Não há caminho de volta.
+# ---------------------------------------------------------------------------
+def test_o_ultimo_admin_nao_consegue_se_rebaixar(auth_client):
+    """BUG REAL, corrigido nesta sessão: o sistema podia ficar sem administrador.
+
+    `PATCH /users/{id}` aceitava `role` sem nenhuma guarda. Um admin que se pusesse como
+    operador perdia, na requisição seguinte, `/users`, `/audit`, todo `DELETE` e a venda de
+    veículo — e não havia recuperação: `seed()` só cria o admin com a tabela VAZIA, e este
+    sistema não tem "esqueci minha senha". O conserto seria SQL na unha, no Postgres.
+
+    O `assert` que importa não é o 409: é continuar administrador DE VERDADE depois.
+    """
+    eu = auth_client.get("/auth/me").json()
+
+    r = auth_client.patch(f"/users/{eu['id']}", json={"role": "operador"})
+    assert r.status_code == 409, r.text
+
+    assert auth_client.get("/auth/me").json()["role"] == "admin"
+    assert auth_client.get("/users").status_code == 200, "continua administrando o sistema"
+
+
+def test_o_ultimo_admin_nao_consegue_se_desativar(auth_client):
+    """A outra porta para o mesmo estado: `is_active: false` em si mesmo.
+
+    Pior que o rebaixamento — `get_current_user` recusa usuário inativo, então nem entrar
+    no sistema seria possível.
+    """
+    eu = auth_client.get("/auth/me").json()
+
+    r = auth_client.patch(f"/users/{eu['id']}", json={"is_active": False})
+    assert r.status_code == 409, r.text
+
+    assert auth_client.get("/auth/me").status_code == 200, "o token continua valendo"
+    assert auth_client.get("/users").json()[0]["is_active"] is True
+
+
+def test_com_outro_admin_no_sistema_o_rebaixamento_passa(auth_client, login):
+    """CONTRAPROVA, e ela é obrigatória: a trava é "sobrar um admin ATIVO", não
+    "administrador nunca muda de papel". Sem este teste, um `PATCH` que recusasse todo
+    mundo o tempo todo passaria nos dois testes acima.
+    """
+    eu = auth_client.get("/auth/me").json()
+    r = auth_client.post(
+        "/users",
+        json={
+            "email": "segundo.admin@erpfrota.com.br",
+            "full_name": "Segundo Admin",
+            "role": "admin",
+            "password": "segundo123",
+        },
+    )
+    assert r.status_code == 201, r.text
+    outro = login("segundo.admin@erpfrota.com.br", "segundo123")
+
+    assert auth_client.patch(f"/users/{eu['id']}", json={"role": "operador"}).status_code == 200
+
+    # O rebaixamento valeu na requisição seguinte, e o sistema continua administrável.
+    assert auth_client.get("/users").status_code == 403
+    assert outro.get("/users").status_code == 200
+
+
+def test_o_penultimo_admin_ativo_nao_pode_desativar_o_ultimo(auth_client, login):
+    """A trava conta admins ATIVOS, não admins cadastrados.
+
+    Dois administradores, um deles já desativado: rebaixar o que sobrou tem que ser
+    recusado do mesmo jeito — senão o sistema fica com um admin no banco e ninguém
+    conseguindo entrar.
+    """
+    eu = auth_client.get("/auth/me").json()
+    r = auth_client.post(
+        "/users",
+        json={
+            "email": "admin.ferias@erpfrota.com.br",
+            "full_name": "Admin de Férias",
+            "role": "admin",
+            "password": "ferias1234",
+        },
+    )
+    assert r.status_code == 201, r.text
+    dormindo = r.json()
+
+    # Desativar o segundo é permitido: ainda sobra este.
+    assert auth_client.patch(f"/users/{dormindo['id']}", json={"is_active": False}).status_code == 200
+
+    # Agora o único ATIVO sou eu — e o rebaixamento volta a ser recusado.
+    assert auth_client.patch(f"/users/{eu['id']}", json={"role": "operador"}).status_code == 409
+    assert auth_client.get("/users").status_code == 200
+
+
 def test_operador_faz_o_trabalho_do_dia_a_dia(operador, criar_veiculo, hoje):
     """O 403 acima não pode ter travado a operação: operador lança receita e despesa."""
     veiculo = criar_veiculo()

@@ -99,7 +99,10 @@ def list_receivables(db: Db, _: CurrentUser, only_overdue: bool = False):
         .join(Vehicle, Vehicle.id == Revenue.vehicle_id)
         .outerjoin(Driver, Driver.id == Revenue.driver_id)
         .options(noload(Revenue.payments))
-        .where(Revenue.status.in_(_OPEN))
+        # Veículo excluído sai da frota e sai daqui junto: o `/finance/dashboard` já não
+        # conta essas cobranças, e duas telas com números diferentes sobre a mesma
+        # inadimplência é pior do que qualquer um dos dois números.
+        .where(Revenue.status.in_(_OPEN), Vehicle.deleted_at.is_(None))
         .order_by(Revenue.due_date)
     )
     if only_overdue:

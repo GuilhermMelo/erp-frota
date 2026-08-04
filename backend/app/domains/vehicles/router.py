@@ -180,5 +180,18 @@ def delete_vehicle(vehicle_id: UUID, db: Db, _: AdminUser):
     contabilidade.
     """
     vehicle = _get(db, vehicle_id)
+
+    # A MESMA regra da venda, pela outra porta. Sair da frota com contrato ativo deixa o
+    # contrato `active`: `generate_all_charges` itera contratos por STATUS e não olha o
+    # veículo, então ele continuaria criando aluguel semanal, para sempre, para um carro
+    # que já não está na frota — e a caução do motorista ficaria presa num contrato de um
+    # carro cuja conta ninguém mais consegue abrir (o resultado responde 404).
+    em_uso = contracts_service.active_contract_for_vehicle(db, vehicle.id)
+    if em_uso:
+        raise Conflict(
+            f"O veículo tem um contrato ativo ({em_uso.code}). Encerre o contrato — "
+            "acertando a caução — antes de excluir."
+        )
+
     vehicle.deleted_at = datetime.now(UTC)
     db.commit()

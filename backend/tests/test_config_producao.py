@@ -13,8 +13,11 @@ Rodam em SUBPROCESSO porque `settings` é um singleton construído no import: mu
 variável de ambiente depois de `import app` não teria efeito nenhum.
 """
 
+import re
 import subprocess
 import sys
+
+from tests.conftest import BACKEND_DIR, PROJECT_DIR
 
 CARREGA = "import app.core.config"
 
@@ -101,8 +104,8 @@ def test_em_dev_nada_disso_e_exigido():
 # ---------------------------------------------------------------------------
 import pytest  # noqa: E402
 
-from app.core.config import settings  # noqa: E402
-from app.db.session import _engine_kwargs  # noqa: E402
+from app.core.config import DEFAULT_SECRET, settings  # noqa: E402
+from app.db.session import _engine_kwargs, alembic_engine_kwargs  # noqa: E402
 
 
 @pytest.mark.parametrize(
@@ -153,3 +156,109 @@ def test_tenant_e_pooler_convivem(monkeypatch):
     assert kw["connect_args"]["options"] == "-csearch_path=demo"
     assert kw["connect_args"]["prepare_threshold"] is None
     assert kw["poolclass"].__name__ == "NullPool"
+
+
+# ---------------------------------------------------------------------------
+# A METADE DESCOBERTA: o engine que o Alembic monta.
+#
+# BUG REAL, corrigido nesta sessão. `migrations/env.py` criava o próprio engine com
+# `poolclass=pool.NullPool` na mão — metade do tratamento do pooler. O `prepare_threshold`
+# ficava de fora, e a migração é o que roda em TODO boot, antes de a API atender a primeira
+# requisição. O erro (`prepared statement "_pg3_0" does not exist`) derrubaria o deploy de
+# forma intermitente, no lugar mais difícil de investigar que existe.
+# ---------------------------------------------------------------------------
+@pytest.mark.parametrize(
+    "url",
+    [
+        "postgresql+psycopg://u:p@aws-0-sa-east-1.pooler.supabase.com:6543/postgres",
+        "postgresql+psycopg://u:p@db.exemplo.com:6543/postgres",
+    ],
+)
+def test_a_migracao_tambem_desliga_o_prepared_statement_no_pooler(url, monkeypatch):
+    monkeypatch.setattr(settings, "DATABASE_URL", url)
+    monkeypatch.setattr(settings, "DB_SCHEMA", "")
+    kw = alembic_engine_kwargs()
+    assert kw["connect_args"]["prepare_threshold"] is None
+    assert kw["poolclass"].__name__ == "NullPool"
+
+
+def test_a_migracao_na_conexao_direta_nao_leva_nada_a_mais(monkeypatch):
+    """Contraprova: sem pooler, `prepare_threshold` não tem por que existir. Um
+    `alembic_engine_kwargs()` que devolvesse sempre o mesmo dicionário passaria no teste
+    acima e falharia aqui."""
+    monkeypatch.setattr(settings, "DATABASE_URL", "postgresql+psycopg://u:p@localhost:5434/frota")
+    monkeypatch.setattr(settings, "DB_SCHEMA", "")
+    assert alembic_engine_kwargs()["connect_args"] == {}
+
+
+def test_a_migracao_usa_de_fato_os_ajustes_de_session_py():
+    """Os dois testes acima só significam alguma coisa se o `env.py` CHAMAR a função.
+
+    Ele já montou o engine na mão uma vez — foi assim que o buraco nasceu.
+    """
+    fonte = (BACKEND_DIR / "migrations" / "env.py").read_text(encoding="utf-8")
+    assert "alembic_engine_kwargs()" in fonte, "o env.py voltou a montar o engine sozinho"
+    assert "poolclass=pool" not in fonte
+
+
+# ---------------------------------------------------------------------------
+# scripts/web.ps1 — o único script que abre a porta para a REDE.
+#
+# CRÍTICO, corrigido nesta sessão. Ele subia o uvicorn em `0.0.0.0` a partir do
+# código-fonte, sem definir ENV nem SECRET_KEY. As duas defesas do config.py ficavam
+# desarmadas ao mesmo tempo: o sorteio por instalação só vale para o .exe
+# (`paths.IS_FROZEN`), e a recusa do segredo padrão só vale fora de `ENV=dev`. Resultado:
+# o sistema ia para o Wi-Fi assinando JWT com `dev-secret-troque-em-producao`, que está
+# escrito no código-fonte de um repositório PÚBLICO — qualquer aparelho da rede forjava um
+# token de admin SEM SENHA e baixava CNH e contrato assinado por /files/{id}/download.
+# ---------------------------------------------------------------------------
+WEB_PS1 = (PROJECT_DIR / "scripts" / "web.ps1").read_text(encoding="utf-8")
+
+
+def _env_do_script_da_rede() -> str:
+    achado = re.search(r'\$env:ENV\s*=\s*"([^"]+)"', WEB_PS1)
+    assert achado, "web.ps1 não define $env:ENV: voltaria a subir na rede como dev"
+    return achado.group(1)
+
+
+def test_o_script_da_rede_define_o_segredo_antes_de_subir_o_servidor():
+    assert "$env:SECRET_KEY" in WEB_PS1, "web.ps1 sem SECRET_KEY: assina JWT com o padrão público"
+    assert "installation_secret" in WEB_PS1, (
+        "o segredo tem que ser o sorteado por instalação (secret.key), não um literal no script"
+    )
+    assert _env_do_script_da_rede() != "dev"
+    # Ordem importa: definido depois do uvicorn subir, o servidor já teria lido o padrão.
+    assert WEB_PS1.index("$env:SECRET_KEY") < WEB_PS1.index("uvicorn")
+
+
+def test_o_env_do_script_da_rede_recusa_o_segredo_publicado():
+    """O acoplamento que faz a correção valer: o ENV que o web.ps1 usa TEM que ser um que
+    o config.py trate como não-dev. Senão o script definiria o segredo e a trava seguiria
+    desarmada — bastaria alguém rodar o uvicorn na mão para voltar ao buraco."""
+    r = _sobe(
+        **{
+            **BASE,
+            "ENV": _env_do_script_da_rede(),
+            "SECRET_KEY": DEFAULT_SECRET,
+            "ADMIN_PASSWORD": "",
+        }
+    )
+    assert r.returncode != 0
+    assert "SECRET_KEY" in r.stderr
+
+
+def test_o_env_do_script_da_rede_nao_exige_admin_password():
+    """E a fronteira: na máquina do dono a senha sorteada é entregue em
+    `senha-inicial-admin.txt`, que ele abre. Exigir `ADMIN_PASSWORD` aqui só ensinaria a
+    contornar o modo seguro — que é como travas de segurança morrem."""
+    r = _sobe(
+        **{
+            **BASE,
+            "ENV": _env_do_script_da_rede(),
+            "SECRET_KEY": "x" * 40,
+            "ADMIN_PASSWORD": "",
+        }
+    )
+    assert r.returncode == 0, r.stderr
+    # A contraprova de que a dispensa é só do modo desktop já existe acima, em
+    # `test_sem_admin_password_derruba_o_boot` (ENV=production).

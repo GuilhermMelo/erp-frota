@@ -9,7 +9,56 @@ PATCH gravasse sem o resultado acompanhar, o operador corrigiria o dígito, veri
 novo na tela de cadastro e continuaria com o lucro errado — pior que não ter edição.
 """
 
+from datetime import timedelta
 from decimal import Decimal
+
+
+def test_nao_da_para_excluir_um_carro_alugado(
+    auth_client, criar_veiculo, criar_motorista, hoje
+):
+    """BUG REAL, corrigido nesta sessão: a corrupção da venda, pela porta da exclusão.
+
+    Vender um carro com contrato ativo já dava 409 (`test_finance`). Excluir, não — o
+    DELETE só gravava `deleted_at` e o contrato continuava `active`. E `generate_all_charges`
+    itera os contratos por STATUS, sem olhar o veículo: a cada abertura do app nascia mais
+    um aluguel de R$ 800 para um carro que já não está na frota, e a caução do motorista
+    ficava presa num contrato cuja conta responde 404.
+
+    Como falha se a guarda sumir: o DELETE volta a devolver 204 e o `assert 409` quebra.
+    """
+    veiculo = criar_veiculo(purchase_price="50000.00")
+    motorista = criar_motorista()
+
+    contrato = auth_client.post(
+        "/contracts",
+        json={
+            "vehicle_id": veiculo["id"],
+            "driver_id": motorista["id"],
+            "start_date": str(hoje - timedelta(days=21)),
+            "weekly_amount": "800.00",
+            "deposit_amount": "2000.00",
+        },
+    )
+    assert contrato.status_code == 201, contrato.text
+
+    r = auth_client.delete(f"/vehicles/{veiculo['id']}")
+    assert r.status_code == 409, r.text
+    # A mensagem cita o contrato: o dono precisa saber QUAL encerrar.
+    assert contrato.json()["code"] in r.json()["error"]["message"]
+
+    # O 409 não pode ter deixado a exclusão pela metade.
+    assert auth_client.get(f"/vehicles/{veiculo['id']}").status_code == 200
+
+    # CONTRAPROVA: encerrado o contrato (e acertada a caução), o DELETE passa. Sem isto o
+    # teste acima passaria também com um endpoint quebrado para todo mundo.
+    fim = auth_client.post(
+        f"/contracts/{contrato.json()['id']}/finish",
+        json={"end_date": str(hoje), "deposit_returned_amount": "2000.00"},
+    )
+    assert fim.status_code == 200, fim.text
+
+    assert auth_client.delete(f"/vehicles/{veiculo['id']}").status_code == 204
+    assert auth_client.get(f"/vehicles/{veiculo['id']}").status_code == 404
 
 
 def test_corrigir_dados_de_identificacao(auth_client, criar_veiculo):

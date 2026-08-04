@@ -6,8 +6,21 @@ Se algum teste deste arquivo falhar, o modelo financeiro está errado. Não é u
 regressão de código: é o contrato do produto.
 """
 
-from datetime import timedelta
+from datetime import date, timedelta
 from decimal import Decimal
+
+
+def _dia_de_mes_atras(hoje: date, n: int) -> date:
+    """Dia 15 de `n` meses atrás.
+
+    Dia 15 de propósito: qualquer outro dia faria o teste quebrar sozinho no dia 31 de um
+    mês, ou em fevereiro — falha por calendário, não por regra de negócio.
+    """
+    ano, mes = hoje.year, hoje.month - n
+    while mes <= 0:
+        mes += 12
+        ano -= 1
+    return date(ano, mes, 15)
 
 
 def test_ciclo_de_vida_do_veiculo_fecha_em_zero(
@@ -421,6 +434,230 @@ def test_veiculo_inexistente_ou_excluido_nao_tem_conta(auth_client, criar_veicul
     auth_client.delete(f"/vehicles/{veiculo['id']}")
 
     assert auth_client.get(f"/finance/vehicles/{veiculo['id']}").status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# O carro que saiu da frota não pode continuar cobrando na tela inicial.
+# ---------------------------------------------------------------------------
+def test_cobranca_de_carro_excluido_sai_do_a_receber_e_da_inadimplencia(
+    auth_client, criar_veiculo, hoje
+):
+    """BUG REAL, corrigido nesta sessão.
+
+    `/finance/fleet` e `/finance/vehicles/{id}` já ignoravam o veículo soft-deletado (o
+    segundo responde 404). `/finance/dashboard` e `/revenues/receivables` não ignoravam:
+    a tela inicial anunciava "R$ 800 em atraso" de um carro que sumiu da frota, o dono
+    clicava no número, chegava na cobrança e não conseguia abrir o veículo. Dois números
+    sobre o mesmo dinheiro, e o auditável dizia o contrário do exibido.
+
+    Como falha se o filtro sumir: os quatro `assert` de "depois" voltam a ver os R$ 800.
+    """
+    veiculo = criar_veiculo()
+    ontem = hoje - timedelta(days=1)
+
+    cobranca = auth_client.post(
+        "/revenues",
+        json={
+            "vehicle_id": veiculo["id"],
+            "category": "aluguel",
+            "amount": "800.00",
+            "competence_date": str(ontem),
+            "due_date": str(ontem),
+            "pay_now": False,
+        },
+    )
+    assert cobranca.status_code == 201, cobranca.text
+
+    # CONTROLE POSITIVO. Sem ele, o teste passaria também se a cobrança nunca tivesse
+    # existido — que é a segunda armadilha do CLAUDE.md ("passar por ausência").
+    antes = auth_client.get("/finance/dashboard").json()
+    assert Decimal(antes["total_receivable"]) == Decimal("800.00")
+    assert Decimal(antes["total_overdue"]) == Decimal("800.00")
+    assert antes["overdue_count"] == 1
+    em_atraso = auth_client.get("/revenues/receivables").json()
+    assert [x["id"] for x in em_atraso] == [cobranca.json()["id"]]
+
+    assert auth_client.delete(f"/vehicles/{veiculo['id']}").status_code == 204
+
+    depois = auth_client.get("/finance/dashboard").json()
+    assert Decimal(depois["total_receivable"]) == Decimal("0.00")
+    assert Decimal(depois["total_overdue"]) == Decimal("0.00")
+    assert depois["overdue_count"] == 0
+    assert auth_client.get("/revenues/receivables").json() == []
+    # A razão de tudo isso: a conta desse carro já não pode ser aberta.
+    assert auth_client.get(f"/finance/vehicles/{veiculo['id']}").status_code == 404
+
+
+def test_o_caixa_do_mes_nao_muda_quando_o_carro_sai_da_frota(
+    auth_client, criar_veiculo, lancar_receita
+):
+    """A FRONTEIRA do filtro acima, escrita de propósito.
+
+    "A receber" é uma promessa sobre o futuro e some junto com o carro. O caixa do mês é
+    extrato: aqueles R$ 800 entraram na conta do dono e apagar o cadastro não desfaz isso.
+    Se alguém "consertar" o filtro de um jeito abrangente demais, este teste quebra.
+    """
+    veiculo = criar_veiculo()
+    lancar_receita(veiculo["id"], "800.00")  # recebida hoje
+
+    antes = auth_client.get("/finance/dashboard").json()
+    assert Decimal(antes["revenue_received_month"]) == Decimal("800.00")
+
+    assert auth_client.delete(f"/vehicles/{veiculo['id']}").status_code == 204
+
+    depois = auth_client.get("/finance/dashboard").json()
+    assert Decimal(depois["revenue_received_month"]) == Decimal("800.00")
+
+
+# ---------------------------------------------------------------------------
+# PAYBACK — "em quanto tempo o carro se pagou".
+#
+# Estava sem um único teste, e é a única armadilha da lista do CLAUDE.md sem cobertura:
+# "payback cobre só a OPERAÇÃO (a venda não entra)". Todos os testes abaixo são de
+# REGRESSÃO: o comportamento já estava certo em `finance/queries.py:payback`.
+# ---------------------------------------------------------------------------
+def test_payback_marca_o_mes_em_que_o_carro_se_pagou(
+    criar_veiculo, lancar_receita, resultado, hoje
+):
+    """Comprado por 1.200, rendeu 500 por mês: no 3º mês o acumulado (1.500) passa dos 1.200."""
+    veiculo = criar_veiculo(purchase_price="1200.00")
+    for n in (3, 2, 1):
+        dia = _dia_de_mes_atras(hoje, n)
+        lancar_receita(
+            veiculo["id"],
+            "500.00",
+            competence_date=str(dia),
+            due_date=str(dia),
+            paid_on=str(dia),
+        )
+
+    r = resultado(veiculo["id"])
+    assert r["payback_month"] == _dia_de_mes_atras(hoje, 1).strftime("%Y-%m")
+    assert r["payback_months_elapsed"] == 3
+    assert r["payback_months_remaining"] == 0
+
+
+def test_payback_projeta_o_que_falta_pela_media_dos_ultimos_meses(
+    criar_veiculo, lancar_receita, resultado, hoje
+):
+    """Contraprova do teste acima: quando ainda não se pagou, sai a PROJEÇÃO, não o mês.
+
+    10.000 de investimento, 2.500 por mês em 2 meses: faltam 5.000, média 2.500 → 2 meses.
+    """
+    veiculo = criar_veiculo(purchase_price="10000.00")
+    for n in (2, 1):
+        dia = _dia_de_mes_atras(hoje, n)
+        lancar_receita(
+            veiculo["id"],
+            "2500.00",
+            competence_date=str(dia),
+            due_date=str(dia),
+            paid_on=str(dia),
+        )
+
+    r = resultado(veiculo["id"])
+    assert r["payback_month"] is None, "ainda não se pagou: não há mês de retorno"
+    assert r["payback_months_elapsed"] is None
+    assert r["payback_months_remaining"] == 2
+
+
+def test_a_venda_nao_conta_como_payback(auth_client, criar_veiculo, resultado, hoje):
+    """A ARMADILHA do CLAUDE.md: payback é o carro se pagar RODANDO, não na revenda.
+
+    Comprado por 50.000 e vendido por 60.000, sem ter rodado um dia: o LUCRO é 10.000 (a
+    venda entra na conta de lucro), e o payback é vazio (a venda não entra nele).
+
+    A asserção é dupla de propósito. Um teste que só checasse `payback_month is None`
+    passaria igual se o payback nunca fosse calculado — o `profit` prova que a conta rodou.
+    """
+    veiculo = criar_veiculo(purchase_price="50000.00")
+    venda = auth_client.post(
+        f"/vehicles/{veiculo['id']}/sell",
+        json={"sale_price": "60000.00", "sale_date": str(hoje)},
+    )
+    assert venda.status_code == 200, venda.text
+
+    r = resultado(veiculo["id"])
+    assert Decimal(r["profit"]) == Decimal("10000.00")
+    assert r["payback_month"] is None
+    assert r["payback_months_remaining"] is None
+
+
+def test_carro_vendido_nao_recebe_projecao_de_payback(
+    auth_client, criar_veiculo, lancar_receita, resultado, hoje
+):
+    """Projetar "faltam 49 meses" para um carro que não é mais seu seria mentira.
+
+    O controle positivo aqui é o MESMO carro antes da venda: ele recebia projeção. Sem
+    isso, o teste passaria com um payback que nunca calcula nada.
+    """
+    veiculo = criar_veiculo(purchase_price="50000.00")
+    mes_passado = _dia_de_mes_atras(hoje, 1)
+    lancar_receita(
+        veiculo["id"],
+        "1000.00",
+        competence_date=str(mes_passado),
+        due_date=str(mes_passado),
+        paid_on=str(mes_passado),
+    )
+
+    antes = resultado(veiculo["id"])
+    assert antes["payback_months_remaining"] == 49, "50.000 − 1.000 recebido, a 1.000/mês"
+
+    venda = auth_client.post(
+        f"/vehicles/{veiculo['id']}/sell",
+        json={"sale_price": "60000.00", "sale_date": str(hoje)},
+    )
+    assert venda.status_code == 200, venda.text
+
+    depois = resultado(veiculo["id"])
+    assert depois["payback_months_remaining"] is None
+    assert depois["payback_month"] is None
+    # O resultado dele agora é o lucro final realizado: 1.000 − 50.000 + 60.000.
+    assert Decimal(depois["profit"]) == Decimal("11000.00")
+
+
+def test_payback_e_vazio_quando_o_carro_nao_custou_nada(
+    criar_veiculo, lancar_receita, resultado, hoje
+):
+    """Investimento zero: não há o que pagar de volta. Vazio, não zero e não erro 500."""
+    veiculo = criar_veiculo(purchase_price="0.00", purchase_date=str(hoje - timedelta(days=60)))
+    lancar_receita(veiculo["id"], "1000.00")
+
+    r = resultado(veiculo["id"])
+    # CONTROLE POSITIVO: a operação existiu, então o vazio não é "não havia nada a somar".
+    assert Decimal(r["total_received"]) == Decimal("1000.00")
+    assert Decimal(r["investment"]) == Decimal("0.00")
+    assert r["payback_month"] is None
+    assert r["payback_months_elapsed"] is None
+    assert r["payback_months_remaining"] is None
+
+
+def test_carro_que_so_da_prejuizo_nao_ganha_prazo_inventado(
+    auth_client, criar_veiculo, lancar_despesa, resultado, hoje
+):
+    """Sem nenhum mês de lucro não há média para projetar. A resposta honesta é vazio.
+
+    (Dividir pela média de meses negativos daria um prazo NEGATIVO — "se pagou mês que
+    vem", para um carro que só consome dinheiro.)
+    """
+    veiculo = criar_veiculo(purchase_price="50000.00")
+    mes_passado = _dia_de_mes_atras(hoje, 1)
+    lancar_despesa(
+        veiculo["id"],
+        "900.00",
+        competence_date=str(mes_passado),
+        paid_on=str(mes_passado),
+    )
+
+    # CONTROLE POSITIVO: a série mensal EXISTE e é negativa — o laço do payback rodou.
+    meses = auth_client.get("/finance/monthly", params={"vehicle_id": veiculo["id"]}).json()
+    assert [m["month"] for m in meses] == [mes_passado.strftime("%Y-%m")]
+    assert Decimal(meses[0]["profit"]) == Decimal("-900.00")
+
+    r = resultado(veiculo["id"])
+    assert r["payback_month"] is None
+    assert r["payback_months_remaining"] is None
 
 
 def test_serie_mensal(auth_client, criar_veiculo, lancar_receita, lancar_despesa, hoje):

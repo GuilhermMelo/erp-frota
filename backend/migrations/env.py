@@ -1,10 +1,11 @@
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy import engine_from_config, pool, text
+from sqlalchemy import engine_from_config, text
 
 from app.core.config import settings
 from app.db.base import Base  # importa todos os models
+from app.db.session import alembic_engine_kwargs
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
@@ -32,10 +33,13 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
+    # Os ajustes do pooler vêm de `db/session.py` — um lugar só. Montar o engine aqui com
+    # `poolclass=NullPool` na mão deixava o `prepare_threshold=None` de fora, e a migração
+    # (que roda em todo boot) era a metade descoberta do sistema.
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
+        **alembic_engine_kwargs(),
     )
     with connectable.connect() as connection:
         if SCHEMA != "public":

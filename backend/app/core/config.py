@@ -68,6 +68,18 @@ class Settings(BaseSettings):
     def is_dev(self) -> bool:
         return self.ENV == "dev"
 
+    @property
+    def is_desktop(self) -> bool:
+        """Roda na máquina do dono, com uma pasta que ele consegue abrir.
+
+        `ENV=lan` é o `scripts/web.ps1`: mesmo computador, mesmo banco, só que escutando
+        em `0.0.0.0` para o celular alcançar. Ele NÃO é `dev` de propósito — exposto na
+        rede, o SECRET_KEY tem que ser tão sério quanto em produção, e é a validação
+        abaixo que obriga isso. Mas o `ADMIN_PASSWORD` continua dispensável: aqui existe
+        `%LOCALAPPDATA%\\GM Locacoes\\senha-inicial-admin.txt` e o dono lê o arquivo.
+        """
+        return self.ENV in ("dev", "lan")
+
     @model_validator(mode="after")
     def _resolve(self) -> "Settings":
         # A pasta de arquivos é a MESMA no código-fonte e no .exe instalado (ver paths.py).
@@ -97,7 +109,7 @@ class Settings(BaseSettings):
         # Sem a senha configurada, o seed sorteia e grava num arquivo. Isso funciona no
         # desktop, onde o dono abre a pasta e lê. Num container o arquivo morre com o
         # deploy: ninguém nunca veria a senha e o sistema nasceria inacessível.
-        if not self.is_dev and not self.ADMIN_PASSWORD:
+        if not self.is_desktop and not self.ADMIN_PASSWORD:
             raise RuntimeError(
                 f"ADMIN_PASSWORD é obrigatório para ENV={self.ENV}. Fora do desktop não há "
                 "onde entregar uma senha sorteada. Defina a variável, entre no sistema e "

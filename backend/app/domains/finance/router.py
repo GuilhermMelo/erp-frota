@@ -19,6 +19,20 @@ router = APIRouter(prefix="/finance", tags=["financeiro"])
 ZERO = Decimal("0.00")
 EM_ABERTO = [RevenueStatus.pending, RevenueStatus.partial]
 
+# COBRANÇA EM ABERTO DE CARRO EXCLUÍDO NÃO É "A RECEBER".
+#
+# `/finance/fleet` e `/finance/vehicles/{id}` já ignoram o veículo soft-deletado (o segundo
+# responde 404). Sem o mesmo filtro aqui, a tela inicial anunciava "a receber" e
+# "inadimplência" de carros que sumiram da frota: o dono clicava no número, chegava na lista
+# de cobranças e não conseguia abrir o veículo. Dois números sobre o mesmo dinheiro, um deles
+# impossível de auditar.
+#
+# O caixa do mês (recebido/pago) NÃO leva este filtro de propósito: aquele dinheiro entrou e
+# saiu de verdade, e apagar o carro não desfaz o extrato.
+VEICULO_NA_FROTA = select(Vehicle.id).where(
+    Vehicle.id == Revenue.vehicle_id, Vehicle.deleted_at.is_(None)
+).exists()
+
 
 def _money(value) -> Decimal:
     """Dinheiro é Decimal, ponto. `coalesce(sum(...), 0)` pode voltar int quando não há linhas."""
@@ -89,7 +103,7 @@ def dashboard(db: Db, _: CurrentUser):
     receivable = _money(
         db.scalar(
             select(func.coalesce(func.sum(Revenue.amount - Revenue.paid_amount), 0)).where(
-                Revenue.status.in_(EM_ABERTO)
+                Revenue.status.in_(EM_ABERTO), VEICULO_NA_FROTA
             )
         )
     )
@@ -98,7 +112,7 @@ def dashboard(db: Db, _: CurrentUser):
         select(
             func.coalesce(func.sum(Revenue.amount - Revenue.paid_amount), 0),
             func.count(Revenue.id),
-        ).where(Revenue.status.in_(EM_ABERTO), Revenue.due_date < today)
+        ).where(Revenue.status.in_(EM_ABERTO), Revenue.due_date < today, VEICULO_NA_FROTA)
     ).one()
 
     return DashboardOut(

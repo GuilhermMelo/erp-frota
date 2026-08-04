@@ -4,6 +4,46 @@
 > o detalhe de como um bug foi corrigido vive no `git log`, não aqui. Este arquivo guarda decisão
 > e pendência — o que o próximo leitor precisa para não repetir trabalho.
 
+## Sessão 9 — auditoria final (04/08/2026)
+
+Varredura por agentes nos dois sistemas, procurando regra de negócio furada e falha de
+plataforma. Cinco achados no `erp-frota`, todos com teste. **204 testes** (eram 177).
+
+**CRÍTICO — `scripts/web.ps1` assinava JWT com o segredo público.** É o único script que abre
+a porta para a REDE, e subia o uvicorn sem definir `ENV` nem `SECRET_KEY`. As duas defesas do
+`config.py` ficavam desarmadas ao mesmo tempo: o sorteio por instalação só vale para o `.exe`
+(`paths.IS_FROZEN`) e a recusa do segredo padrão só vale fora de `ENV=dev`. Qualquer aparelho
+no Wi-Fi forjava um token de admin **sem senha**, com um segredo que se lê neste repositório,
+e baixava CNH e contrato assinado. Agora há `ENV=lan`: exige `SECRET_KEY` sério como produção,
+mas continua dispensando `ADMIN_PASSWORD` (aqui existe o arquivo com a senha sorteada). O teste
+lê o próprio script e confere que o segredo é definido ANTES do uvicorn — depois, o servidor já
+teria lido o padrão.
+
+**`DELETE /vehicles` sem trava de contrato ativo.** A venda dava 409; a exclusão, não. O
+contrato seguia `active` e a geração semanal — que itera por status, sem olhar o veículo —
+criava aluguel novo a cada boot para um carro fora da frota, com a caução presa num contrato
+cuja conta responde 404. Mesma corrupção da venda, entrando por outra porta.
+
+**Anexo de cadastro excluído continuava baixável.** Soft delete no motorista, e `documents` é
+ponteiro polimórfico sem FK: nada cascateia. A listagem sumia da tela e o `GET /files/{id}`
+continuava servindo o PDF. Direito de eliminação (LGPD) não pode depender de ninguém não
+adivinhar o id.
+
+**Painel e lista de cobranças discordavam.** `/finance/dashboard` somava "a receber" e
+inadimplência de veículos excluídos. O dono clicava no número e não conseguia abrir o carro.
+O caixa do mês NÃO leva o filtro, de propósito: aquele dinheiro entrou de verdade.
+
+**O último admin podia se rebaixar.** Sem volta: `seed()` só cria admin com a tabela vazia e
+não há "esqueci minha senha". O conserto seria SQL na mão.
+
+**Meia correção anterior, minha:** `migrations/env.py` montava o próprio engine e levava só o
+`NullPool`, sem o `prepare_threshold=None`. A migração roda em TODO boot — o erro
+`prepared statement "_pg3_0"` derrubaria o deploy de forma intermitente. Unificado em
+`alembic_engine_kwargs()`, com um teste que falha se o `env.py` voltar a montar engine sozinho.
+
+**Confirmado no ar:** `gm-locacoes.onrender.com` respondendo `{"status":"ok","db":"up"}`. O
+"não consegui acessar" era a hibernação do plano grátis (~46s no primeiro acesso), não falha.
+
 ## Próximo
 
 1. **Rodar `scripts\backup.ps1` toda semana e levar uma cópia para fora da máquina.** O script

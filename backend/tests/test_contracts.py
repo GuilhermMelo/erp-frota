@@ -84,6 +84,64 @@ def test_gerar_de_novo_nao_cria_nenhuma(auth_client, contrato_de_3_semanas):
     assert {c["id"] for c in depois} == {c["id"] for c in antes}, "são as MESMAS cobranças"
 
 
+def test_mudar_o_inicio_de_um_contrato_que_ja_cobrou_e_recusado(
+    auth_client, contrato_de_3_semanas, hoje
+):
+    """REGRESSÃO. A idempotência é ancorada em `period_start`, e o `period_start` sai da
+    `start_date`: mudar o início desloca TODA a grade de semanas. A
+    `UNIQUE(contract_id, period_start)` não veria duplicata nenhuma — são chaves novas —
+    e a próxima abertura do app geraria de novo as 4 semanas já cobradas.
+
+    O `assert` que importa não é o 409: é o faturamento continuar em R$ 3.200.
+    """
+    antes = _cobrancas(auth_client, contrato_de_3_semanas)
+    assert len(antes) == 4, "CONTROLE POSITIVO: existe grade gerada para ser deslocada"
+    faturado = sum(Decimal(c["amount"]) for c in antes)
+    assert faturado == Decimal("3200.00")
+
+    r = auth_client.patch(
+        f"/contracts/{contrato_de_3_semanas['id']}",
+        json={"start_date": str(hoje - timedelta(days=19))},
+    )
+    assert r.status_code == 409, r.text
+
+    assert auth_client.post("/contracts/generate-charges").json()["geradas"] == 0
+    depois = _cobrancas(auth_client, contrato_de_3_semanas)
+    assert len(depois) == 4
+    assert sum(Decimal(c["amount"]) for c in depois) == faturado
+
+
+def test_mudar_o_dia_de_cobranca_nao_duplica_as_semanas_ja_cobradas(
+    auth_client, contrato_de_3_semanas
+):
+    """REGRESSÃO da decisão de desenho que separa `period_start` de `due_date`.
+
+    `generate_charges` anda a grade a partir da `start_date`; o `billing_weekday` decide
+    só o DIA DE VENCIMENTO dentro da semana (`week_due_date`). Se alguém ancorasse o
+    `period_start` no dia da semana — que é a implementação "óbvia" —, trocar o dia de
+    cobrança deslocaria todo `period_start` e a próxima geração criaria as 4 semanas de
+    novo, R$ 3.200 cobrados em duplicidade, sem violar a UNIQUE.
+
+    Aqui o PATCH é permitido (200) de propósito: o dono pode mudar o dia de pagamento.
+    O que não pode é isso mexer no que já foi cobrado.
+    """
+    antes = _cobrancas(auth_client, contrato_de_3_semanas)
+    assert len(antes) == 4, "CONTROLE POSITIVO: há 4 semanas para eventualmente duplicar"
+    faturado = sum(Decimal(c["amount"]) for c in antes)
+
+    r = auth_client.patch(
+        f"/contracts/{contrato_de_3_semanas['id']}", json={"billing_weekday": 3}
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["billing_weekday"] == 3
+
+    assert auth_client.post("/contracts/generate-charges").json()["geradas"] == 0
+    depois = _cobrancas(auth_client, contrato_de_3_semanas)
+    assert len(depois) == 4
+    assert sum(Decimal(c["amount"]) for c in depois) == faturado
+    assert {c["period_start"] for c in depois} == {c["period_start"] for c in antes}
+
+
 def test_gerar_por_contrato_tambem_e_idempotente(auth_client, contrato_de_3_semanas):
     r = auth_client.post(f"/contracts/{contrato_de_3_semanas['id']}/generate-charges")
     assert r.status_code == 200, r.text
