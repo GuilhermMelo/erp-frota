@@ -61,7 +61,7 @@ def alembic_engine_kwargs() -> dict:
     `_engine_kwargs()`. Ele levava só o `NullPool` — metade do tratamento — e a migração
     é o que roda em TODO boot, antes de a API atender uma requisição sequer. Pelo pooler,
     sem `prepare_threshold=None`, o `prepared statement "_pg3_0" does not exist` derruba o
-    boot de forma intermitente (CLAUDE.md, armadilha 9).
+    boot de forma intermitente (ARQUITETURA.md, armadilha 9).
 
     `pool_pre_ping` não entra: a migração roda uma vez e fecha, não há conexão parada no
     pool para revalidar.

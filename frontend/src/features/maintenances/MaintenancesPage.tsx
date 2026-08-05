@@ -300,7 +300,7 @@ function NewMaintenanceModal({
         kind: values.kind,
         description: values.description || null,
         supplier_name: values.supplier_name || null,
-        // STRING, sempre. Virar float aqui seria bug de dinheiro (CLAUDE.md, regra 1).
+        // STRING, sempre. Virar float aqui seria bug de dinheiro (ARQUITETURA.md, regra 1).
         amount: values.amount,
         performed_on: values.performed_on,
         odometer: Number(values.odometer),

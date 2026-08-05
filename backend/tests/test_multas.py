@@ -228,7 +228,7 @@ def test_apagar_a_multa_apaga_a_despesa_e_deixa_rastro(
 
     `expenses.fine_id` é ON DELETE CASCADE. Apagar a multa fazia o Postgres apagar a
     despesa por baixo do ORM — e o listener de auditoria é cego a cascata de banco
-    (CLAUDE.md, regra 3). O custo do veículo caía R$ 300 e o log não tinha uma linha
+    (ARQUITETURA.md, regra 3). O custo do veículo caía R$ 300 e o log não tinha uma linha
     sequer dizendo quem apagou o quê.
     """
     veiculo = criar_veiculo()

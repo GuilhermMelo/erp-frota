@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, computed_field, condecimal
 from app.domains.fines.models import FineStatus
 from app.domains.revenues.models import PaymentMethod
 
-# Dinheiro é SEMPRE Decimal — nunca float (CLAUDE.md, regra 1).
+# Dinheiro é SEMPRE Decimal — nunca float (ARQUITETURA.md, regra 1).
 MoneyPositive = condecimal(max_digits=12, decimal_places=2, gt=0)
 
 

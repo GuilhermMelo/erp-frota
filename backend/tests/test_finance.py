@@ -469,7 +469,7 @@ def test_cobranca_de_carro_excluido_sai_do_a_receber_e_da_inadimplencia(
     assert cobranca.status_code == 201, cobranca.text
 
     # CONTROLE POSITIVO. Sem ele, o teste passaria também se a cobrança nunca tivesse
-    # existido — que é a segunda armadilha do CLAUDE.md ("passar por ausência").
+    # existido — que é a segunda armadilha do ARQUITETURA.md ("passar por ausência").
     antes = auth_client.get("/finance/dashboard").json()
     assert Decimal(antes["total_receivable"]) == Decimal("800.00")
     assert Decimal(antes["total_overdue"]) == Decimal("800.00")
@@ -512,7 +512,7 @@ def test_o_caixa_do_mes_nao_muda_quando_o_carro_sai_da_frota(
 # ---------------------------------------------------------------------------
 # PAYBACK — "em quanto tempo o carro se pagou".
 #
-# Estava sem um único teste, e é a única armadilha da lista do CLAUDE.md sem cobertura:
+# Estava sem um único teste, e é a única armadilha da lista do ARQUITETURA.md sem cobertura:
 # "payback cobre só a OPERAÇÃO (a venda não entra)". Todos os testes abaixo são de
 # REGRESSÃO: o comportamento já estava certo em `finance/queries.py:payback`.
 # ---------------------------------------------------------------------------
@@ -562,7 +562,7 @@ def test_payback_projeta_o_que_falta_pela_media_dos_ultimos_meses(
 
 
 def test_a_venda_nao_conta_como_payback(auth_client, criar_veiculo, resultado, hoje):
-    """A ARMADILHA do CLAUDE.md: payback é o carro se pagar RODANDO, não na revenda.
+    """A ARMADILHA do ARQUITETURA.md: payback é o carro se pagar RODANDO, não na revenda.
 
     Comprado por 50.000 e vendido por 60.000, sem ter rodado um dia: o LUCRO é 10.000 (a
     venda entra na conta de lucro), e o payback é vazio (a venda não entra nele).
@@ -658,6 +658,47 @@ def test_carro_que_so_da_prejuizo_nao_ganha_prazo_inventado(
     r = resultado(veiculo["id"])
     assert r["payback_month"] is None
     assert r["payback_months_remaining"] is None
+
+
+def test_carro_que_empatou_no_mes_nao_estoura_divisao_por_zero(
+    auth_client, criar_veiculo, lancar_receita, lancar_despesa, resultado, hoje
+):
+    """O CASO DO MEIO, que nenhum dos outros seis cobria: nem lucro, nem prejuízo. ZERO.
+
+    O filtro é `m["profit"] > 0`. Relaxar para `>= 0` — que parece a mesma coisa e é o tipo de
+    ajuste que passa numa revisão — faz o mês empatado entrar na média, `media` vira `0` e a
+    linha seguinte é `falta / media`: **DivisionByZero, HTTP 500**. É a armadilha do
+    `ARQUITETURA.md` ("retornar NULL, não 500") entrando por uma porta que não é a de sempre: aqui
+    o divisor não é o investimento, é a média que o próprio filtro deveria ter esvaziado.
+
+    Um teste com prejuízo (o de cima) NÃO pega isso: `-900 >= 0` é falso, então a lista sai
+    vazia dos dois jeitos e a mutação sobrevive.
+    """
+    veiculo = criar_veiculo(purchase_price="50000.00")
+    mes_passado = _dia_de_mes_atras(hoje, 1)
+    lancar_receita(
+        veiculo["id"],
+        "900.00",
+        competence_date=str(mes_passado),
+        due_date=str(mes_passado),
+        paid_on=str(mes_passado),
+    )
+    lancar_despesa(
+        veiculo["id"],
+        "900.00",
+        competence_date=str(mes_passado),
+        paid_on=str(mes_passado),
+    )
+
+    # CONTROLE POSITIVO: o mês existe e o lucro dele é EXATAMENTE zero. Sem esta asserção, o
+    # teste passaria também se receita e despesa não tivessem sido lançadas.
+    meses = auth_client.get("/finance/monthly", params={"vehicle_id": veiculo["id"]}).json()
+    assert [m["month"] for m in meses] == [mes_passado.strftime("%Y-%m")]
+    assert Decimal(meses[0]["profit"]) == Decimal("0.00")
+
+    r = resultado(veiculo["id"])
+    assert r["payback_months_remaining"] is None, "carro que empata não se paga nunca"
+    assert r["payback_month"] is None
 
 
 def test_serie_mensal(auth_client, criar_veiculo, lancar_receita, lancar_despesa, hoje):

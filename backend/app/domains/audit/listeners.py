@@ -15,7 +15,7 @@ Então: coleta-se o diff em before_flush, e grava-se em after_flush.
 
 ARMADILHA CONHECIDA: o listener é CEGO a DML em massa
 (`session.execute(update(...))`, `query.delete()`), porque isso não passa pelo ORM.
-Regra do projeto (CLAUDE.md, nº 3): services nunca usam bulk DML em tabela auditada.
+Regra do projeto (ARQUITETURA.md, nº 3): services nunca usam bulk DML em tabela auditada.
 Carregue o objeto e altere o atributo.
 """
 

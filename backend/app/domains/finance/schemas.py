@@ -1,7 +1,7 @@
 """Saída financeira.
 
 TODO valor é `Decimal`. Nunca `float` — em ERP financeiro, `float` é bug de dinheiro
-(CLAUDE.md, regra 1).
+(ARQUITETURA.md, regra 1).
 
 Os campos que podem vir NULL (`roi`, `cost_per_km`, `profit_if_sold_today`) são
 `Decimal | None` de propósito: dividir por um investimento zero ou por um carro que ainda

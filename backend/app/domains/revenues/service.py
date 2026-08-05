@@ -4,7 +4,7 @@ O contrato desta camada, em uma frase: **`paid_amount` e `status` são CONSEQUÊ
 pagamentos, nunca entrada do usuário.** Toda vez que um pagamento entra, os dois são
 recalculados a partir da soma real de `revenue.payments`. Ninguém "marca como pago".
 
-Nenhuma função aqui usa bulk DML (CLAUDE.md, regra 3): o listener de auditoria é cego a
+Nenhuma função aqui usa bulk DML (ARQUITETURA.md, regra 3): o listener de auditoria é cego a
 `session.execute(update(...))` e o log ficaria com buraco justo onde o dinheiro se move.
 Carrega-se o objeto e altera-se o atributo.
 
@@ -121,7 +121,7 @@ def create_revenue(
     `origin=contract` + `contract_id` + `period_start/end` — a UNIQUE(contract_id,
     period_start) torna a geração semanal idempotente.
 
-    ATENÇÃO (CLAUDE.md, regra 4): não existe receita de "venda de veículo" nem de "caução".
+    ATENÇÃO (ARQUITETURA.md, regra 4): não existe receita de "venda de veículo" nem de "caução".
     A venda mora em `vehicles.sale_price` e a caução em `contracts.deposit_amount`. Criar
     receita para elas contaria o lucro do carro em dobro.
     """

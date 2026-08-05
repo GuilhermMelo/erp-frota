@@ -1,4 +1,4 @@
-# CLAUDE.md — GM Locações (ERP de Frota)
+# ARQUITETURA.md — GM Locações (ERP de Frota)
 
 ERP de frota de uma locadora de veículos para motoristas de app. **Repositório público.**
 

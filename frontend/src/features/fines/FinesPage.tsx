@@ -10,7 +10,7 @@
  * Por isso a tela mostra as três colunas juntas — valor, reembolsado e custo líquido. É o
  * ponto do módulo.
  *
- * ATENÇÃO (CLAUDE.md, regra 1): dinheiro vem como STRING e não vira conta aqui. `reimbursed_amount`
+ * ATENÇÃO (ARQUITETURA.md, regra 1): dinheiro vem como STRING e não vira conta aqui. `reimbursed_amount`
  * e `net_cost` chegam prontos da API. Os `Number(...)` deste arquivo existem SÓ para comparar
  * (escolher um rótulo ou habilitar um botão) — nenhum valor exibido é calculado no frontend.
  */

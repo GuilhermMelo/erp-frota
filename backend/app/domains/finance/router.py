@@ -1,4 +1,6 @@
 from datetime import date, timedelta
+
+from app.core.tempo import hoje
 from decimal import Decimal
 from uuid import UUID
 
@@ -80,7 +82,7 @@ def monthly_series(db: Db, _: CurrentUser, vehicle_id: UUID | None = None):
 @router.get("/dashboard", response_model=DashboardOut)
 def dashboard(db: Db, _: CurrentUser):
     """Resumo da tela inicial: como está a frota e como está o mês."""
-    today = date.today()
+    today = hoje()
     month_start, next_month = _current_month(today)
 
     by_status = _vehicles_by_status(db)

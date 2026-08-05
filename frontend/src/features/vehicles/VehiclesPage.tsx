@@ -29,7 +29,7 @@ import { FUEL_TYPES, type Vehicle, type VehicleResult } from './types'
 
 /* ---------------------------------------------------------------- formulário */
 
-/** Dinheiro fica STRING do formulário até a API — nunca vira float (CLAUDE.md, regra 1). */
+/** Dinheiro fica STRING do formulário até a API — nunca vira float (ARQUITETURA.md, regra 1). */
 const moneyField = (label: string) =>
   z
     .string()

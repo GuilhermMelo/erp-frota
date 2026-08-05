@@ -1,4 +1,6 @@
 from datetime import date, datetime
+
+from app.core.tempo import hoje
 from decimal import Decimal
 from uuid import UUID
 
@@ -11,7 +13,7 @@ from app.domains.revenues.models import (
     RevenueStatus,
 )
 
-# Dinheiro é SEMPRE Decimal (CLAUDE.md, regra 1). O CHECK do banco é `amount > 0`.
+# Dinheiro é SEMPRE Decimal (ARQUITETURA.md, regra 1). O CHECK do banco é `amount > 0`.
 Money = condecimal(max_digits=12, decimal_places=2, gt=0)
 
 
@@ -56,7 +58,7 @@ class RevenueCreate(BaseModel):
             self.due_date = self.competence_date
         if self.pay_now:
             if self.paid_on is None:
-                self.paid_on = date.today()
+                self.paid_on = hoje()
         elif self.paid_on is not None:
             raise ValueError("Para registrar o pagamento junto, envie pay_now = true.")
         return self

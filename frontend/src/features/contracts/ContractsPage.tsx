@@ -92,7 +92,7 @@ const DOCUMENT_KINDS: Record<string, string> = {
  * Dinheiro vem da API como STRING ("2000.00") porque é `Decimal` no backend.
  *
  * As duas funções abaixo existem SÓ para a prévia do acerto da caução na tela, e fazem a
- * conta em CENTAVOS INTEIROS — nunca em float, que é bug de dinheiro (CLAUDE.md, regra 1).
+ * conta em CENTAVOS INTEIROS — nunca em float, que é bug de dinheiro (ARQUITETURA.md, regra 1).
  * O número que VALE é o que o backend calcula em `Decimal` no POST /contracts/{id}/finish;
  * aqui só mostramos ao operador o que vai acontecer antes de ele confirmar.
  */

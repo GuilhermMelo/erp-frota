@@ -144,7 +144,7 @@ def download(storage_key: str, mime_type: str, filename: str | None) -> Response
     """Devolve os bytes do arquivo.
 
     SEMPRE por endpoint autenticado: `storage/` nunca é servido como pasta estática, porque
-    lá dentro tem CNH, CPF e contrato assinado (LGPD — CLAUDE.md, regra 5).
+    lá dentro tem CNH, CPF e contrato assinado (LGPD — ARQUITETURA.md, regra 5).
     """
     name = filename or "arquivo"
     ascii_name = _UNSAFE_IN_HEADER.sub("_", name) or "arquivo"

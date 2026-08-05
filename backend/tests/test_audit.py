@@ -133,7 +133,7 @@ def test_apagar_manutencao_deixa_rastro_da_despesa(auth_client, criar_veiculo, l
     """REGRESSÃO (bug real): a despesa da manutenção sumia do custo do carro SEM log.
 
     `expenses.maintenance_id` é ON DELETE CASCADE. Apagar a manutenção fazia o Postgres
-    apagar a despesa por baixo do ORM, e o listener é cego a cascata de banco (CLAUDE.md,
+    apagar a despesa por baixo do ORM, e o listener é cego a cascata de banco (ARQUITETURA.md,
     regra 3): o custo do veículo caía e o log não registrava nada.
     """
     from sqlalchemy import select

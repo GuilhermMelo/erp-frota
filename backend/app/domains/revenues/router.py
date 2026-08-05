@@ -1,4 +1,6 @@
 from datetime import date
+
+from app.core.tempo import hoje
 from uuid import UUID
 
 from fastapi import APIRouter, status
@@ -92,7 +94,7 @@ def list_receivables(db: Db, _: CurrentUser, only_overdue: bool = False):
     Não existe status 'overdue' no banco de propósito — estado armazenado precisaria de um job
     noturno e estaria errado toda manhã antes de ele rodar.
     """
-    today = date.today()
+    today = hoje()
 
     stmt = (
         select(Revenue, Vehicle.plate, Driver.full_name)

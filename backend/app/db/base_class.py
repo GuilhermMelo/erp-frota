@@ -17,7 +17,7 @@ NAMING_CONVENTION = {
     "pk": "pk_%(table_name)s",
 }
 
-# Dinheiro é SEMPRE Numeric(12,2)/Decimal. Nunca float. Ver CLAUDE.md, regra 1.
+# Dinheiro é SEMPRE Numeric(12,2)/Decimal. Nunca float. Ver ARQUITETURA.md, regra 1.
 MONEY = Numeric(12, 2)
 Money = Annotated[Decimal, mapped_column(MONEY)]
 

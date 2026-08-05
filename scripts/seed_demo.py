@@ -1,6 +1,6 @@
 """Frota fictícia para demonstração e para os screenshots do README.
 
-NADA aqui é real: placas, CPFs, CNHs e nomes são inventados (regra 6 do CLAUDE.md).
+NADA aqui é real: placas, CPFs, CNHs e nomes são inventados (regra 6 do ARQUITETURA.md).
 
 Por que existe: demonstrar o sistema para alguém usando o banco de trabalho exporia CPF e
 CNH de motoristas de verdade (LGPD). Este script monta uma cópia fictícia num banco à parte.

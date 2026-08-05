@@ -44,6 +44,26 @@ não há "esqueci minha senha". O conserto seria SQL na mão.
 **Confirmado no ar:** `gm-locacoes.onrender.com` respondendo `{"status":"ok","db":"up"}`. O
 "não consegui acessar" era a hibernação do plano grátis (~46s no primeiro acesso), não falha.
 
+## Sessão 10 — o que a auditoria deixou em aberto (05/08/2026)
+
+**209 testes** (eram 204).
+
+**Fuso horário — ninguém tinha olhado, nos dois projetos.** Não havia `TZ` em lugar nenhum, e
+quatro pontos decidiam "hoje" por `date.today()`, que segue o fuso do PROCESSO: BRT no desktop,
+UTC no container. A inadimplência é derivada de `due_date < hoje`, então das 21h à meia-noite,
+todo dia, os dois responderiam datas diferentes para o mesmo banco. Agora existe
+`app/core/tempo.py` com o fuso da operação fixo no código — não em variável de ambiente, porque
+um deploy que esquece a variável não pode ter o direito de mudar em que dia uma dívida vence. Um
+teste varre `app/` e falha se `date.today()` reaparecer.
+
+**Payback com mês de lucro exatamente zero.** O filtro `profit > 0` está certo; faltava o teste.
+Relaxar para `>= 0` — ajuste que passa em revisão — faz a média virar zero e a divisão seguinte
+estourar 500. O teste de prejuízo não pegava: `-900 >= 0` é falso e a lista sai vazia dos dois
+jeitos.
+
+**README reescrito** como apresentação: menos bibliotecas citadas, mais o que o sistema faz.
+`CLAUDE.md` virou `ARQUITETURA.md` — mesmo conteúdo, e todas as referências no código atualizadas.
+
 ## Próximo
 
 1. **Rodar `scripts\backup.ps1` toda semana e levar uma cópia para fora da máquina.** O script
@@ -94,8 +114,8 @@ descobrir o quadro real: existe um segundo sistema, `gm-locacoes` — reescrita 
 
 A reescrita foi decisão do dono (TypeScript em toda a stack e app Android nativo), não falha
 deste projeto. Este repositório fica **público, como portfólio, e continua sendo a fonte das
-regras de negócio**: as armadilhas do `CLAUDE.md` foram descobertas aqui, com dado real, e o
-`CLAUDE.md` do outro repositório manda ler este antes de projetar qualquer módulo financeiro.
+regras de negócio**: as armadilhas do `ARQUITETURA.md` foram descobertas aqui, com dado real, e o
+`ARQUITETURA.md` do outro repositório manda ler este antes de projetar qualquer módulo financeiro.
 
 Vale registrar o que se discutiu, porque a premissa merece cuidado: **repositório público não
 impede um sistema de rodar operação real.** O trabalho da Sessão 4 — nenhum segredo no código,
@@ -203,7 +223,7 @@ herda o handle de stdout, o pipeline nunca fecha e o script trava com o banco de
 mudou: ele custava um pré-requisito pesado (Docker Desktop instalado e rodando) para quem só quer
 abrir o programa, e este é um sistema de uma máquina só.
 
-### CLAUDE.md refatorado
+### ARQUITETURA.md refatorado
 
 Três mudanças que valem mais que a arrumação:
 
@@ -396,7 +416,7 @@ Varridos os 3 commits inteiros (`git log --all -p`), não só a árvore atual:
 - A pasta do clone é `erp`, não `erp-frota-v1`. **Deixou de importar:** o nome só afetava o volume
   do Docker, e o caminho dos dados hoje é fixo em `%LOCALAPPDATA%`.
 
-### CLAUDE.md reescrito
+### ARQUITETURA.md reescrito
 
 Encurtado (entra no contexto toda sessão) e ganhou duas seções: **Segurança** (7 regras para
 repositório aberto) e **Economia de contexto** (não ler arquivo inteiro, não rodar a suíte toda
@@ -414,7 +434,7 @@ Levantada a opção de fechar o repositório e **recusada pelo dono**: o projeto
 Duas consequências, que não são opcionais a partir daqui:
 
 1. A regra "nenhum segredo no código-fonte" deixa de ser higiene e passa a ser a única defesa que
-   existe. Por isso é a regra 1 da seção de Segurança do `CLAUDE.md`, escrita como regra.
+   existe. Por isso é a regra 1 da seção de Segurança do `ARQUITETURA.md`, escrita como regra.
 2. **Documentação errada custa mais do que documentação ausente.** Quem lê um repositório de
    portfólio julga pelo README. O README pedia Docker Desktop como pré-requisito — falso desde o
    commit `2f73735`, que trocou o Docker pelo Postgres embutido.
@@ -437,16 +457,11 @@ Verificado: a senha do arquivo entra, `admin123` recebe 401. Os 3 registros de a
 sobreviveram à exclusão do usuário — que é exatamente o que o `actor_email` desnormalizado, sem
 FK para `users`, foi feito para garantir.
 
-### graphify instalado
+### Grafo de conhecimento do código
 
-`graphifyy` (PyPI, projeto `Graphify-Labs/graphify`) via `uv tool install`. Atenção ao escolher:
-existe um `@sentropic/graphify` no npm, de outra organização (`rhanka/graphify`), com nome quase
-idêntico — o README oficial avisa que os outros pacotes `graphify*` não são afiliados.
-
-A skill mora em `~/.claude/skills/graphify/` (perfil do usuário, não do projeto). Custo em
-contexto por sessão: 3 linhas no `~/.claude/CLAUDE.md`; os 39 KB do `SKILL.md` só carregam quando
-`/graphify` é chamado. `graphify-out/` está no `.gitignore` — é derivado do código, regerável com
-`graphify update .`.
+Ferramenta local de indexação, para navegar dependências entre módulos. A saída fica em
+`graphify-out/`, que está no `.gitignore`: é derivada do código e se regera a qualquer momento —
+versionar produziria conflito em todo commit sem acrescentar nada.
 
 ---
 
@@ -474,4 +489,4 @@ Projeto criado do zero e entregue funcionando ponta a ponta, depois empacotado c
 
 `sys.stdout is None` com `console=False` · `ModuleNotFoundError: app.db.base` no PyInstaller ·
 Program Files não é gravável · path traversal no catch-all da SPA. Todos viraram armadilha
-documentada no `CLAUDE.md`.
+documentada no `ARQUITETURA.md`.

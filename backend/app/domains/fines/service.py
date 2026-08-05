@@ -231,7 +231,7 @@ def delete_fine(db: Session, fine: Fine) -> None:
 
     # A despesa vinculada é apagada pelo ORM, e NÃO pelo ON DELETE CASCADE do FK.
     # O FK continua lá como rede de proteção, mas a cascata do banco não passa pelo ORM:
-    # o listener de auditoria é cego a ela (CLAUDE.md, regra 3) e o log ficaria com um
+    # o listener de auditoria é cego a ela (ARQUITETURA.md, regra 3) e o log ficaria com um
     # buraco exatamente onde o custo do veículo mudou — a despesa some do resultado do
     # carro e ninguém sabe quem a apagou.
     expense = db.scalar(select(Expense).where(Expense.fine_id == fine.id))

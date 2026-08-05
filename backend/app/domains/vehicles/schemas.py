@@ -7,10 +7,10 @@ from pydantic import BaseModel, ConfigDict, Field, condecimal, field_validator, 
 
 from app.domains.vehicles.models import FuelType, VehicleStatus
 
-# Dinheiro é SEMPRE Decimal (CLAUDE.md, regra 1). Espelha o Numeric(12,2) do banco.
+# Dinheiro é SEMPRE Decimal (ARQUITETURA.md, regra 1). Espelha o Numeric(12,2) do banco.
 Money = condecimal(max_digits=12, decimal_places=2, gt=0)
 # Compra e valor de mercado aceitam ZERO: o CHECK do banco é `>= 0` e existe carro recebido
-# de graça — CLAUDE.md lista `purchase_price = 0` como caso previsto (o ROI já trata a
+# de graça — ARQUITETURA.md lista `purchase_price = 0` como caso previsto (o ROI já trata a
 # divisão por zero). Barrar aqui tornaria impossível cadastrar esse carro.
 MoneyOrZero = condecimal(max_digits=12, decimal_places=2, ge=0)
 

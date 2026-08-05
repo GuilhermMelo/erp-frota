@@ -89,7 +89,7 @@ def _no_duplicates(items: list[InspectionItemIn]) -> None:
 
 def _advance_odometer(vehicle: Vehicle, odometer: int) -> None:
     """KM só anda para frente. Objeto carregado, atributo alterado — nunca bulk DML,
-    senão o listener de auditoria fica cego (CLAUDE.md, regra 3)."""
+    senão o listener de auditoria fica cego (ARQUITETURA.md, regra 3)."""
     if odometer > vehicle.current_odometer:
         vehicle.current_odometer = odometer
 

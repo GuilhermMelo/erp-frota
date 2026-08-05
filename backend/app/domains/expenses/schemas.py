@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, condecimal, model_validator
 
 from app.domains.expenses.models import ExpenseOrigin, ExpenseStatus
 
-# Dinheiro é SEMPRE Decimal (CLAUDE.md, regra 1). O CHECK do banco é `amount > 0`.
+# Dinheiro é SEMPRE Decimal (ARQUITETURA.md, regra 1). O CHECK do banco é `amount > 0`.
 Money = condecimal(max_digits=12, decimal_places=2, gt=0)
 
 

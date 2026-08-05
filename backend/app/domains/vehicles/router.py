@@ -140,7 +140,7 @@ def update_vehicle(vehicle_id: UUID, data: VehicleUpdate, db: Db, _: CurrentUser
 def sell_vehicle(vehicle_id: UUID, data: VehicleSell, db: Db, _: AdminUser):
     """Fecha o ciclo de vida do carro.
 
-    O valor de venda mora AQUI e em nenhum outro lugar (CLAUDE.md, regra 4): lançá-lo
+    O valor de venda mora AQUI e em nenhum outro lugar (ARQUITETURA.md, regra 4): lançá-lo
     também como receita contaria o lucro do carro em dobro.
     """
     vehicle = _get(db, vehicle_id)

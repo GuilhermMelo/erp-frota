@@ -87,7 +87,7 @@ const DE_CONTRATO = 'Gerada pelo contrato — edite ou encerre o contrato, não 
  * Dinheiro vem da API como STRING ("800.00") porque é `Decimal` no backend.
  *
  * Estas duas funções servem SÓ para mostrar o saldo em aberto de uma cobrança na tela, e
- * fazem a conta em CENTAVOS INTEIROS — nunca em float, que é bug de dinheiro (CLAUDE.md,
+ * fazem a conta em CENTAVOS INTEIROS — nunca em float, que é bug de dinheiro (ARQUITETURA.md,
  * regra 1). Quem decide se um pagamento cabe no saldo é o backend, em `Decimal`.
  */
 function toCents(value: string): number | null {

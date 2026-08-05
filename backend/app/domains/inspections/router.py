@@ -56,7 +56,7 @@ def list_inspections(
 
 @router.get("/inspections/photos/{photo_id}/download")
 def download_photo(db: Db, _: CurrentUser, photo_id: UUID) -> Response:
-    """AUTENTICADO. `storage/` nunca é pasta estática (CLAUDE.md, regra 5)."""
+    """AUTENTICADO. `storage/` nunca é pasta estática (ARQUITETURA.md, regra 5)."""
     photo = service.get_photo(db, photo_id)
     return files_service.download(photo.storage_key, photo.mime_type, photo.original_filename)
 

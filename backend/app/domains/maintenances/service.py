@@ -83,7 +83,7 @@ def update_maintenance(
 def delete_maintenance(db: Session, maintenance: Maintenance) -> None:
     # A despesa vinculada é apagada pelo ORM, e NÃO pelo ON DELETE CASCADE do FK.
     # O FK continua lá como rede de proteção, mas a cascata do banco não passa pelo ORM:
-    # o listener de auditoria é cego a ela (CLAUDE.md, regra 3) e o log ficaria com um
+    # o listener de auditoria é cego a ela (ARQUITETURA.md, regra 3) e o log ficaria com um
     # buraco exatamente onde o custo do veículo mudou.
     expense = db.scalar(select(Expense).where(Expense.maintenance_id == maintenance.id))
     if expense is not None:
@@ -110,7 +110,7 @@ def _bump_odometer(vehicle: Vehicle, odometer: int) -> None:
 
     Uma manutenção antiga lançada depois de uma recente não pode fazer o hodômetro do
     carro voltar — isso corromperia o custo por km, que divide por (atual − compra).
-    Objeto carregado, atributo alterado: nada de bulk DML (CLAUDE.md, regra 3).
+    Objeto carregado, atributo alterado: nada de bulk DML (ARQUITETURA.md, regra 3).
     """
     if odometer > vehicle.current_odometer:
         vehicle.current_odometer = odometer

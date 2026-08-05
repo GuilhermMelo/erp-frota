@@ -4,7 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, condecimal
 
-# Dinheiro é SEMPRE Decimal — nunca float (CLAUDE.md, regra 1).
+# Dinheiro é SEMPRE Decimal — nunca float (ARQUITETURA.md, regra 1).
 # >= 0 e não > 0: serviço em garantia custa zero e mesmo assim vai para o histórico.
 MoneyNonNegative = condecimal(max_digits=12, decimal_places=2, ge=0)
 

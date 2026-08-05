@@ -15,6 +15,8 @@ Duas coisas aqui não são óbvias e as duas vêm do MANIFESTO.md:
 """
 
 from datetime import UTC, date, datetime, timedelta
+
+from app.core.tempo import hoje
 from decimal import Decimal
 from uuid import UUID
 
@@ -110,7 +112,7 @@ def create_contract(db: Session, data: ContractCreate) -> Contract:
     )
     db.add(contract)
 
-    # Objeto carregado, atributo alterado — nunca bulk DML (CLAUDE.md, regra 3):
+    # Objeto carregado, atributo alterado — nunca bulk DML (ARQUITETURA.md, regra 3):
     # o listener de auditoria é cego a UPDATE em massa.
     vehicle.status = VehicleStatus.rented
 
@@ -243,7 +245,7 @@ def generate_charges(
         return []
 
     # Nunca cobrar semana futura: uma semana só é cobrável depois de começar.
-    limite = date.today()
+    limite = hoje()
     if until is not None:
         limite = min(limite, until)
     if contract.end_date is not None:

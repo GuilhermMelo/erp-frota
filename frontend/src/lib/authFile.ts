@@ -1,7 +1,7 @@
 /**
  * Arquivos da API: upload e download — SEMPRE autenticados.
  *
- * `storage/` nunca é pasta estática (CLAUDE.md, regra 5): lá dentro tem CNH, CPF, contrato
+ * `storage/` nunca é pasta estática (ARQUITETURA.md, regra 5): lá dentro tem CNH, CPF, contrato
  * assinado e nota fiscal. Todo arquivo sai por endpoint autenticado.
  *
  * Consequência prática: `<a href="/api/files/{id}/download">` NÃO funciona — o navegador não

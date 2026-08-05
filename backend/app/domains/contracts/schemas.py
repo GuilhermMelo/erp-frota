@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, condecimal
 
 from app.domains.contracts.models import ContractStatus, DepositStatus
 
-# Dinheiro é SEMPRE Decimal — nunca float (CLAUDE.md, regra 1).
+# Dinheiro é SEMPRE Decimal — nunca float (ARQUITETURA.md, regra 1).
 MoneyPositive = condecimal(max_digits=12, decimal_places=2, gt=0)
 MoneyNonNegative = condecimal(max_digits=12, decimal_places=2, ge=0)
 
